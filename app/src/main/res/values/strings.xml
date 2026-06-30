@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">S Notes Style</string>
+    <string name="widget_description">Quick access to notes</string>
+    <string name="shortcut_disabled">Shortcut disabled</string>
+    <string name="shortcut_text_short">Text note</string>
+    <string name="shortcut_text_long">Create or open a text note</string>
+    <string name="shortcut_draw_short">Handwriting</string>
+    <string name="shortcut_draw_long">Create or open a handwriting note</string>
+</resources>
