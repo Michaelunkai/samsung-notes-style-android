@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Bundle
@@ -70,7 +71,9 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AssistChip
@@ -101,6 +104,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -1015,10 +1019,19 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     val context = LocalContext.current
     val audioRecorder = remember { AudioRecorder(context) }
     var isRecording by remember { mutableStateOf(false) }
+    var recordingStartedAt by remember { mutableStateOf(0L) }
+    DisposableEffect(audioRecorder) {
+        onDispose {
+            audioRecorder.stop()
+        }
+    }
     val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && !isRecording) {
             val file = audioRecorder.start()
-            isRecording = file != null
+            if (file != null) {
+                recordingStartedAt = System.currentTimeMillis()
+                isRecording = true
+            }
         }
     }
     val attachmentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -1073,13 +1086,17 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                 onRecord = {
                     if (isRecording) {
                         val file = audioRecorder.stop()
+                        val durationMs = (System.currentTimeMillis() - recordingStartedAt).coerceAtLeast(0L)
                         isRecording = false
                         if (file != null) {
-                            viewModel.addBlock(note, NoteBlock.Audio(path = file.absolutePath, name = file.name))
+                            viewModel.addBlock(note, NoteBlock.Audio(path = file.absolutePath, name = file.name, durationHintMs = durationMs))
                         }
                     } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         val file = audioRecorder.start()
-                        isRecording = file != null
+                        if (file != null) {
+                            recordingStartedAt = System.currentTimeMillis()
+                            isRecording = true
+                        }
                     } else {
                         audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
@@ -1682,19 +1699,65 @@ fun formatBytes(sizeBytes: Long): String = when {
 
 @Composable
 fun AudioBlock(note: SNote, block: NoteBlock.Audio, viewModel: NotesViewModel) {
+    var playing by remember(block.path) { mutableStateOf(false) }
+    val player = remember(block.path) { MediaPlayer() }
+    DisposableEffect(block.path) {
+        onDispose {
+            runCatching {
+                if (player.isPlaying) player.stop()
+                player.release()
+            }
+        }
+    }
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.AudioFile, contentDescription = null)
+            FilledIconButton(
+                onClick = {
+                    if (playing) {
+                        runCatching {
+                            player.stop()
+                            player.reset()
+                        }
+                        playing = false
+                    } else {
+                        runCatching {
+                            player.reset()
+                            player.setDataSource(block.path)
+                            player.setOnCompletionListener { playing = false }
+                            player.prepare()
+                            player.start()
+                            playing = true
+                        }.onFailure {
+                            playing = false
+                        }
+                    }
+                }
+            ) {
+                Icon(if (playing) Icons.Default.Stop else Icons.Default.PlayArrow, if (playing) "Stop audio" else "Play audio")
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(block.name, style = MaterialTheme.typography.titleSmall)
-                Text(block.path, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOf(formatDuration(block.durationHintMs), block.path).filter { it.isNotBlank() }.joinToString(" • "),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                 Icon(Icons.Default.Delete, "Delete audio")
             }
         }
     }
+}
+
+fun formatDuration(durationMs: Long): String {
+    if (durationMs <= 0L) return ""
+    val totalSeconds = durationMs / 1000L
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return "%d:%02d".format(minutes, seconds)
 }
 
 class AudioRecorder(private val context: Context) {

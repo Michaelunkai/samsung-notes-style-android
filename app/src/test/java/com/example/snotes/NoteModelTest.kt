@@ -235,4 +235,12 @@ class NoteModelTest {
         assertEquals("900 B", file.sizeLabel)
         assertEquals("", formatBytes(0))
     }
+
+    @Test
+    fun audioDurationFormattingUsesMinuteSecondLabels() {
+        assertEquals("", formatDuration(0))
+        assertEquals("0:01", formatDuration(1_500))
+        assertEquals("1:05", formatDuration(65_000))
+        assertEquals("10:00", formatDuration(600_000))
+    }
 }
