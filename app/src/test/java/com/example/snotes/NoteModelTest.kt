@@ -253,10 +253,14 @@ class NoteModelTest {
             noteDefaults = NoteDefaults(pageTemplate = PageTemplate.Grid)
         )
         val tagState = NotesUiState(surface = NotesSurface.Tags, tagFilter = "launch")
+        val lockedState = NotesUiState(surface = NotesSurface.Locked, notePinDigest = hashNotesPin("1234"))
+        val unlockedState = NotesUiState(surface = NotesSurface.Locked)
 
         val folderNote = NewNoteKind.Text.createNoteForState(folderState)
         val tagNote = NewNoteKind.Checklist.createNoteForState(tagState)
         val meetingNote = NewNoteKind.Meeting.createNoteForState(folderState)
+        val lockedNote = NewNoteKind.Sticky.createNoteForState(lockedState)
+        val unlockedNote = NewNoteKind.Text.createNoteForState(unlockedState)
 
         assertEquals("Work/Product", folderNote.folder)
         assertEquals(PageTemplate.Grid, folderNote.pageTemplate)
@@ -264,6 +268,8 @@ class NoteModelTest {
         assertTrue(tagNote.blocks.single() is NoteBlock.Checklist)
         assertEquals("Work/Product", meetingNote.folder)
         assertTrue(meetingNote.blocks.any { it is NoteBlock.Checklist })
+        assertTrue(lockedNote.locked)
+        assertFalse(unlockedNote.locked)
     }
 
     @Test

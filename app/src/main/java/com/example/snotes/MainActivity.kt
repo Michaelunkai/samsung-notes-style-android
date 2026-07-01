@@ -1447,6 +1447,7 @@ fun NewNoteKind.createNoteForState(state: NotesUiState): SNote {
     return when {
         state.surface == NotesSurface.Folders && state.folderFilter != null -> note.copy(folder = state.folderFilter)
         state.surface == NotesSurface.Tags && state.tagFilter != null -> note.copy(tags = listOf(state.tagFilter))
+        state.surface == NotesSurface.Locked && state.hasNotePin -> note.copy(locked = true)
         else -> note
     }
 }
