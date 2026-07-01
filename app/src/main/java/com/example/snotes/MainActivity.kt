@@ -784,6 +784,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         val notes = _state.value.notes
         viewModelScope.launch(Dispatchers.IO) {
             repository.save(notes)
+            refreshNotesWidgets(getApplication())
         }
     }
 

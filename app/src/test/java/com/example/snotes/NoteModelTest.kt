@@ -287,6 +287,32 @@ class NoteModelTest {
     }
 
     @Test
+    fun widgetSummaryShowsLatestVisibleNoteWithoutLockedPreview() {
+        val empty = notesWidgetSummary(emptyList())
+        val normal = notesWidgetSummary(
+            listOf(
+                SNote(title = "Old", updatedAt = 1, blocks = listOf(NoteBlock.Text(text = "Old body"))),
+                SNote(title = "Latest", updatedAt = 3, blocks = listOf(NoteBlock.Text(text = "Latest body"))),
+                SNote(title = "Deleted", deleted = true, updatedAt = 5)
+            )
+        )
+        val pinned = notesWidgetSummary(
+            listOf(
+                SNote(title = "Recent", updatedAt = 10),
+                SNote(title = "Pinned", pinned = true, updatedAt = 1)
+            )
+        )
+        val locked = notesWidgetSummary(listOf(SNote(title = "Private", locked = true, blocks = listOf(NoteBlock.Text(text = "Secret")))))
+
+        assertEquals(NotesWidgetSummary("S Notes Style", "No notes yet"), empty)
+        assertEquals("Latest", normal.title)
+        assertTrue(normal.subtitle.contains("Latest body"))
+        assertEquals("Pinned", pinned.title)
+        assertEquals("Locked note • 1 note", locked.subtitle)
+        assertFalse(locked.subtitle.contains("Secret"))
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",
