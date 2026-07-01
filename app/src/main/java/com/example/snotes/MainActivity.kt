@@ -148,18 +148,42 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 
+const val ACTION_QUICK_NOTE = "com.example.snotes.action.QUICK_NOTE"
+const val EXTRA_QUICK_NOTE_KIND = "com.example.snotes.extra.QUICK_NOTE_KIND"
+
+data class NoteLaunchRequest(
+    val sharedText: String? = null,
+    val quickNoteKind: NewNoteKind? = null
+)
+
+data class SequencedLaunchRequest(
+    val sequence: Int,
+    val request: NoteLaunchRequest
+)
+
 class MainActivity : ComponentActivity() {
+    private var launchSequence = 0
+    private var launchRequest by mutableStateOf(SequencedLaunchRequest(0, NoteLaunchRequest()))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val sharedText = intent.takeIf { it.action == Intent.ACTION_SEND && it.type?.startsWith("text/") == true }
-            ?.getStringExtra(Intent.EXTRA_TEXT)
+        launchRequest = nextLaunchRequest(intent)
         setContent {
             val notesViewModel: NotesViewModel = viewModel(
                 factory = AndroidViewModelFactory.getInstance(application)
             )
-            NotesApp(notesViewModel, sharedText)
+            NotesApp(notesViewModel, launchRequest)
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        launchRequest = nextLaunchRequest(intent)
+    }
+
+    private fun nextLaunchRequest(intent: Intent): SequencedLaunchRequest =
+        SequencedLaunchRequest(++launchSequence, intent.toNoteLaunchRequest())
 }
 
 data class SNote(
@@ -672,12 +696,36 @@ fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()):
     )
 }
 
+fun Intent.toNoteLaunchRequest(): NoteLaunchRequest =
+    noteLaunchRequestFrom(
+        action = action,
+        mimeType = type,
+        sharedText = getStringExtra(Intent.EXTRA_TEXT),
+        quickKindName = getStringExtra(EXTRA_QUICK_NOTE_KIND)
+    )
+
+fun noteLaunchRequestFrom(
+    action: String?,
+    mimeType: String?,
+    sharedText: String?,
+    quickKindName: String?
+): NoteLaunchRequest {
+    val shared = sharedText
+        ?.takeIf { action == Intent.ACTION_SEND && mimeType?.startsWith("text/") == true }
+        ?.takeIf { it.isNotBlank() }
+    val quickKind = quickKindName
+        ?.takeIf { action == ACTION_QUICK_NOTE }
+        ?.let { raw -> NewNoteKind.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } }
+    return NoteLaunchRequest(sharedText = shared, quickNoteKind = quickKind)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotesApp(viewModel: NotesViewModel, initialSharedText: String? = null) {
+fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = SequencedLaunchRequest(0, NoteLaunchRequest())) {
     val state by viewModel.state.collectAsState()
-    LaunchedEffect(initialSharedText) {
-        if (!initialSharedText.isNullOrBlank()) viewModel.createSharedTextNote(initialSharedText)
+    LaunchedEffect(launchRequest.sequence) {
+        launchRequest.request.sharedText?.let { viewModel.createSharedTextNote(it) }
+        launchRequest.request.quickNoteKind?.let { viewModel.createNote(it) }
     }
     val scheme = if (state.darkMode) {
         darkColorScheme(

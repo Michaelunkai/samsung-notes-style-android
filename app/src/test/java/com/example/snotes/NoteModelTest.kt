@@ -129,6 +129,32 @@ class NoteModelTest {
     }
 
     @Test
+    fun launchRequestParserRoutesSharedTextAndQuickNotes() {
+        val shared = noteLaunchRequestFrom(
+            action = "android.intent.action.SEND",
+            mimeType = "text/plain",
+            sharedText = "Shared meeting note",
+            quickKindName = null
+        )
+        val quickDraw = noteLaunchRequestFrom(
+            action = ACTION_QUICK_NOTE,
+            mimeType = null,
+            sharedText = null,
+            quickKindName = "Drawing"
+        )
+        val invalid = noteLaunchRequestFrom(
+            action = ACTION_QUICK_NOTE,
+            mimeType = null,
+            sharedText = null,
+            quickKindName = "Unknown"
+        )
+
+        assertEquals("Shared meeting note", shared.sharedText)
+        assertEquals(NewNoteKind.Drawing, quickDraw.quickNoteKind)
+        assertEquals(null, invalid.quickNoteKind)
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",

@@ -8,9 +8,13 @@
         android:shortcutLongLabel="@string/shortcut_text_long"
         android:shortcutShortLabel="@string/shortcut_text_short">
         <intent
-            android:action="android.intent.action.MAIN"
+            android:action="com.example.snotes.action.QUICK_NOTE"
             android:targetClass="com.example.snotes.MainActivity"
-            android:targetPackage="com.example.snotes" />
+            android:targetPackage="com.example.snotes">
+            <extra
+                android:name="com.example.snotes.extra.QUICK_NOTE_KIND"
+                android:value="Text" />
+        </intent>
     </shortcut>
     <shortcut
         android:enabled="true"
@@ -20,8 +24,12 @@
         android:shortcutLongLabel="@string/shortcut_draw_long"
         android:shortcutShortLabel="@string/shortcut_draw_short">
         <intent
-            android:action="android.intent.action.MAIN"
+            android:action="com.example.snotes.action.QUICK_NOTE"
             android:targetClass="com.example.snotes.MainActivity"
-            android:targetPackage="com.example.snotes" />
+            android:targetPackage="com.example.snotes">
+            <extra
+                android:name="com.example.snotes.extra.QUICK_NOTE_KIND"
+                android:value="Drawing" />
+        </intent>
     </shortcut>
 </shortcuts>
