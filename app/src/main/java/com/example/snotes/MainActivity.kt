@@ -76,6 +76,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tag
@@ -853,6 +854,41 @@ fun NoteBlock.duplicateBlock(): NoteBlock = when (this) {
     is NoteBlock.Audio -> copy(id = UUID.randomUUID().toString())
 }
 
+fun SNote.toPlainText(): String = buildString {
+    appendLine(title)
+    appendLine("Folder: $folder")
+    if (tags.isNotEmpty()) appendLine("Tags: ${tags.joinToString(", ") { "#$it" }}")
+    appendLine()
+    blocks.forEachIndexed { index, block ->
+        if (index > 0) appendLine()
+        append(block.toPlainText())
+    }
+}.trim()
+
+fun NoteBlock.toPlainText(): String = when (this) {
+    is NoteBlock.Text -> text.ifBlank { "[Empty text]" }
+    is NoteBlock.Checklist -> items.joinToString("\n") { item ->
+        "${if (item.checked) "- [x]" else "- [ ]"} ${item.text.ifBlank { "Checklist item" }}"
+    }
+    is NoteBlock.Drawing -> "[Handwriting: ${strokes.size} stroke${if (strokes.size == 1) "" else "s"}]"
+    is NoteBlock.Attachment -> "[Attachment: $name${sizeLabel.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
+    is NoteBlock.Audio -> "[Audio: $name${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
+}
+
+fun String.sanitizeFileName(): String =
+    replace(Regex("""[\\/:*?"<>|]+"""), "-")
+        .trim()
+        .ifBlank { "Untitled note" }
+        .take(80)
+
+fun shareNoteText(context: Context, note: SNote) {
+    val intent = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_SUBJECT, note.title)
+        .putExtra(Intent.EXTRA_TEXT, note.toPlainText())
+    context.startActivity(Intent.createChooser(intent, "Share note"))
+}
+
 fun Intent.toNoteLaunchRequest(): NoteLaunchRequest =
     noteLaunchRequestFrom(
         action = action,
@@ -1511,6 +1547,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     val audioRecorder = remember { AudioRecorder(context) }
     var isRecording by remember { mutableStateOf(false) }
     var recordingStartedAt by remember { mutableStateOf(0L) }
+    var pendingNoteExportText by remember { mutableStateOf("") }
     DisposableEffect(audioRecorder) {
         onDispose {
             audioRecorder.stop()
@@ -1541,6 +1578,18 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             )
         )
     }
+    val noteExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                writer.write(pendingNoteExportText)
+            } ?: error("Unable to open note export destination")
+        }.onSuccess {
+            viewModel.setStatus("Note exported")
+        }.onFailure {
+            viewModel.setStatus("Note export failed")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -1561,6 +1610,17 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                     }
                     IconButton(onClick = { viewModel.duplicateNote(note) }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate note")
+                    }
+                    IconButton(onClick = { shareNoteText(context, note) }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share note")
+                    }
+                    IconButton(
+                        onClick = {
+                            pendingNoteExportText = note.toPlainText()
+                            noteExportLauncher.launch("${note.title.sanitizeFileName()}.txt")
+                        }
+                    ) {
+                        Icon(Icons.Default.Description, contentDescription = "Export note")
                     }
                     IconButton(onClick = { viewModel.toggleFavorite(note) }) {
                         Icon(

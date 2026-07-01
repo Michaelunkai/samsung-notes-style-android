@@ -239,6 +239,46 @@ class NoteModelTest {
     }
 
     @Test
+    fun notePlainTextExportIncludesMixedContent() {
+        val note = SNote(
+            title = "Sprint review",
+            folder = "Work",
+            tags = listOf("team", "export"),
+            blocks = listOf(
+                NoteBlock.Text(text = "Release summary"),
+                NoteBlock.Checklist(
+                    items = listOf(
+                        CheckItem(text = "Demo", checked = true),
+                        CheckItem(text = "Follow up", checked = false)
+                    )
+                ),
+                NoteBlock.Drawing(strokes = listOf(DrawStroke(color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))),
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
+                NoteBlock.Audio(path = "/audio/review.m4a", name = "review.m4a", durationHintMs = 65_000)
+            )
+        )
+
+        val text = note.toPlainText()
+
+        assertTrue(text.contains("Sprint review"))
+        assertTrue(text.contains("Folder: Work"))
+        assertTrue(text.contains("Tags: #team, #export"))
+        assertTrue(text.contains("Release summary"))
+        assertTrue(text.contains("- [x] Demo"))
+        assertTrue(text.contains("- [ ] Follow up"))
+        assertTrue(text.contains("[Handwriting: 1 stroke]"))
+        assertTrue(text.contains("[Attachment: brief.pdf, 2 KB]"))
+        assertTrue(text.contains("[Audio: review.m4a, 1:05]"))
+    }
+
+    @Test
+    fun noteExportFileNamesAreSanitized() {
+        assertEquals("Work-Plan-Q3-", "Work/Plan:Q3?".sanitizeFileName())
+        assertEquals("Untitled note", "   ".sanitizeFileName())
+        assertEquals(80, "a".repeat(120).sanitizeFileName().length)
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",
