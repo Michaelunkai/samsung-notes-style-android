@@ -629,6 +629,24 @@ class NoteModelTest {
         assertEquals(1, details.attachments)
         assertEquals(1, details.audioBlocks)
         assertEquals(1, details.audioMarkers)
+        assertEquals("6 blocks", details.blockLabel)
+        assertEquals("6 words", details.wordLabel)
+        assertEquals("1/2 done", details.checklistLabel)
+        assertEquals("1 stroke", details.inkLabel)
+        assertEquals("1 file", details.attachmentLabel)
+        assertEquals("1 recording • 1 marker", details.audioLabel)
+    }
+
+    @Test
+    fun noteDetailsLabelsHandleEmptyContent() {
+        val details = SNote(blocks = listOf(NoteBlock.Text(text = ""))).details()
+
+        assertEquals("1 block", details.blockLabel)
+        assertEquals("0 words", details.wordLabel)
+        assertEquals("No checklist items", details.checklistLabel)
+        assertEquals("No ink strokes", details.inkLabel)
+        assertEquals("No attachments", details.attachmentLabel)
+        assertEquals("No audio", details.audioLabel)
     }
 
     @Test

@@ -346,7 +346,29 @@ data class NoteDetails(
     val attachments: Int,
     val audioBlocks: Int,
     val audioMarkers: Int
-)
+) {
+    val blockLabel: String
+        get() = "$blockCount block${if (blockCount == 1) "" else "s"}"
+
+    val wordLabel: String
+        get() = "$wordCount word${if (wordCount == 1) "" else "s"}"
+
+    val checklistLabel: String
+        get() = if (checklistItems == 0) "No checklist items" else "$completedChecklistItems/$checklistItems done"
+
+    val inkLabel: String
+        get() = if (drawingStrokes == 0) "No ink strokes" else "$drawingStrokes stroke${if (drawingStrokes == 1) "" else "s"}"
+
+    val attachmentLabel: String
+        get() = if (attachments == 0) "No attachments" else "$attachments file${if (attachments == 1) "" else "s"}"
+
+    val audioLabel: String
+        get() = when {
+            audioBlocks == 0 -> "No audio"
+            audioMarkers == 0 -> "$audioBlocks recording${if (audioBlocks == 1) "" else "s"}"
+            else -> "$audioBlocks recording${if (audioBlocks == 1) "" else "s"} • $audioMarkers marker${if (audioMarkers == 1) "" else "s"}"
+        }
+}
 
 data class SearchMatch(val scope: SearchScope, val label: String)
 
@@ -2875,14 +2897,13 @@ fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
                 DetailRow("Tags", note.tags.joinToString(", ").ifBlank { "None" })
                 DetailRow("Created", formatTimestamp(note.createdAt))
                 DetailRow("Modified", formatTimestamp(note.updatedAt))
-                DetailRow("Blocks", details.blockCount.toString())
-                DetailRow("Words", details.wordCount.toString())
-                DetailRow("Checklist", "${details.completedChecklistItems}/${details.checklistItems} done")
+                DetailRow("Blocks", details.blockLabel)
+                DetailRow("Words", details.wordLabel)
+                DetailRow("Checklist", details.checklistLabel)
                 DetailRow("Sticky notes", details.stickyNotes.toString())
-                DetailRow("Ink strokes", details.drawingStrokes.toString())
-                DetailRow("Attachments", details.attachments.toString())
-                DetailRow("Audio", details.audioBlocks.toString())
-                DetailRow("Audio markers", details.audioMarkers.toString())
+                DetailRow("Ink", details.inkLabel)
+                DetailRow("Attachments", details.attachmentLabel)
+                DetailRow("Audio", details.audioLabel)
             }
         },
         confirmButton = {
