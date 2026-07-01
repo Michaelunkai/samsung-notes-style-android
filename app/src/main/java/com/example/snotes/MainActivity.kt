@@ -7,11 +7,14 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -74,6 +77,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -892,6 +896,31 @@ fun SNote.toPlainText(): String = buildString {
     }
 }.trim()
 
+fun SNote.toPdfLines(maxLineLength: Int = 88): List<String> =
+    toPlainText()
+        .lineSequence()
+        .flatMap { line -> line.wrapLine(maxLineLength).asSequence() }
+        .toList()
+
+fun String.wrapLine(maxLineLength: Int): List<String> {
+    if (length <= maxLineLength || maxLineLength <= 8) return listOf(this)
+    val words = split(Regex("""\s+"""))
+    val lines = mutableListOf<String>()
+    var current = ""
+    words.forEach { word ->
+        current = when {
+            current.isBlank() -> word
+            current.length + word.length + 1 <= maxLineLength -> "$current $word"
+            else -> {
+                lines += current
+                word
+            }
+        }
+    }
+    if (current.isNotBlank()) lines += current
+    return lines.ifEmpty { listOf("") }
+}
+
 fun NoteBlock.toPlainText(): String = when (this) {
     is NoteBlock.Text -> text.ifBlank { "[Empty text]" }
     is NoteBlock.Checklist -> items.joinToString("\n") { item ->
@@ -914,6 +943,48 @@ fun shareNoteText(context: Context, note: SNote) {
         .putExtra(Intent.EXTRA_SUBJECT, note.title)
         .putExtra(Intent.EXTRA_TEXT, note.toPlainText())
     context.startActivity(Intent.createChooser(intent, "Share note"))
+}
+
+fun writeNotePdf(context: Context, uri: Uri, note: SNote) {
+    val document = PdfDocument()
+    try {
+        val titlePaint = Paint().apply {
+            color = AndroidColor.rgb(43, 42, 39)
+            textSize = 20f
+            isFakeBoldText = true
+        }
+        val bodyPaint = Paint().apply {
+            color = AndroidColor.rgb(43, 42, 39)
+            textSize = 12f
+        }
+        val pageWidth = 595
+        val pageHeight = 842
+        val margin = 48f
+        val lineHeight = 18f
+        val maxLinesPerPage = ((pageHeight - margin * 2) / lineHeight).toInt()
+        val lines = note.toPdfLines().drop(1).ifEmpty { listOf(" ") }
+        var pageNumber = 1
+        lines.chunked(maxLinesPerPage).forEach { chunk ->
+            val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+            val canvas = page.canvas
+            var y = margin
+            if (pageNumber == 1) {
+                canvas.drawText(note.title, margin, y, titlePaint)
+                y += lineHeight * 1.5f
+            }
+            chunk.forEach { line ->
+                canvas.drawText(line, margin, y, bodyPaint)
+                y += lineHeight
+            }
+            document.finishPage(page)
+            pageNumber += 1
+        }
+        context.contentResolver.openOutputStream(uri)?.use { output ->
+            document.writeTo(output)
+        } ?: error("Unable to open PDF destination")
+    } finally {
+        document.close()
+    }
 }
 
 fun Intent.toNoteLaunchRequest(): NoteLaunchRequest =
@@ -1641,6 +1712,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var isRecording by remember { mutableStateOf(false) }
     var recordingStartedAt by remember { mutableStateOf(0L) }
     var pendingNoteExportText by remember { mutableStateOf("") }
+    var pendingPdfExportNote by remember { mutableStateOf<SNote?>(null) }
     DisposableEffect(audioRecorder) {
         onDispose {
             audioRecorder.stop()
@@ -1683,6 +1755,17 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             viewModel.setStatus("Note export failed")
         }
     }
+    val notePdfExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        val exportNote = pendingPdfExportNote ?: note
+        runCatching {
+            writeNotePdf(context, uri, exportNote)
+        }.onSuccess {
+            viewModel.setStatus("PDF exported")
+        }.onFailure {
+            viewModel.setStatus("PDF export failed")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -1714,6 +1797,14 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                         }
                     ) {
                         Icon(Icons.Default.Description, contentDescription = "Export note")
+                    }
+                    IconButton(
+                        onClick = {
+                            pendingPdfExportNote = note
+                            notePdfExportLauncher.launch("${note.title.sanitizeFileName()}.pdf")
+                        }
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "Export PDF")
                     }
                     IconButton(onClick = { viewModel.toggleFavorite(note) }) {
                         Icon(

@@ -279,6 +279,37 @@ class NoteModelTest {
     }
 
     @Test
+    fun pdfLineWrappingPreservesWordsWithinLineLimit() {
+        assertEquals(listOf("alpha beta", "gamma"), "alpha beta gamma".wrapLine(10))
+        assertEquals(listOf("short"), "short".wrapLine(10))
+        assertEquals(listOf("alpha beta gamma"), "alpha beta gamma".wrapLine(8))
+    }
+
+    @Test
+    fun notePdfLinesPrepareExportTextForPdfPages() {
+        val note = SNote(
+            title = "PDF plan",
+            folder = "Work",
+            tags = listOf("export"),
+            blocks = listOf(
+                NoteBlock.Text(text = "alpha beta gamma delta epsilon"),
+                NoteBlock.Checklist(items = listOf(CheckItem(text = "send file", checked = true)))
+            )
+        )
+
+        val lines = note.toPdfLines(maxLineLength = 14)
+
+        assertEquals("PDF plan", lines.first())
+        assertTrue(lines.contains("Tags: #export"))
+        assertTrue(lines.contains("alpha beta"))
+        assertTrue(lines.contains("gamma delta"))
+        assertTrue(lines.contains("epsilon"))
+        assertTrue(lines.contains("- [x] send"))
+        assertTrue(lines.contains("file"))
+        assertTrue(lines.filter { it.isNotBlank() && !it.contains("#") }.all { it.length <= 14 })
+    }
+
+    @Test
     fun folderAndTagHelpersNormalizeOrganizationInput() {
         assertEquals("All notes", normalizeFolder("   "))
         assertEquals("Work/Product", normalizeFolder(" /Work//Product/ "))
