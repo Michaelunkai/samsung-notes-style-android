@@ -10,9 +10,10 @@ Native Android prototype for a Samsung Notes-style note-taking app.
 - Editor screen with auto-persisted title, folder, tag, template, paper color, and mixed block changes.
 - In-note search panel with match counts, snippets, and previous/next navigation.
 - Rich text block controls for bold, italic, underline, text color, highlight color, size presets, font family, and alignment.
+- Sticky note blocks with color palette, minimize/expand, search/export/details integration, and duplication.
 - Checklist blocks with add, edit, complete all, uncheck all, clear done, item reorder, and delete item actions.
 - Handwriting/drawing blocks with pen, fountain pen, highlighter, eraser, stroke width, color palette, undo, clear, vector JSON persistence, and segment-preserving erasing.
-- Mixed note block reorder and duplicate controls for text, checklist, handwriting, attachment, and audio blocks.
+- Mixed note block reorder and duplicate controls for text, sticky, checklist, handwriting, attachment, and audio blocks.
 - Attachment blocks using Android's document picker, image previews, file metadata, and open-with-Android viewer actions.
 - Audio recording blocks using `MediaRecorder`, runtime microphone permission, playback, and shared audio import as playable audio blocks.
 - Local offline-first Room persistence with a first-run migration path from the legacy JSON note store.

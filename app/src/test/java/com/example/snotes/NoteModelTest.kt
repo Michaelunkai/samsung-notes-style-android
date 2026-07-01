@@ -32,6 +32,7 @@ class NoteModelTest {
                         CheckItem(text = "Collect feedback", checked = false)
                     )
                 ),
+                NoteBlock.Sticky(text = "Call out launch risk", color = 0xFFBBF7D0, collapsed = true),
                 NoteBlock.Drawing(
                     activeTool = DrawTool.Highlighter,
                     strokes = listOf(
@@ -57,7 +58,7 @@ class NoteModelTest {
         assertTrue(restored.favorite)
         assertEquals(PageTemplate.Grid, restored.pageTemplate)
         assertEquals(0xFFEFF6FF, restored.paperColor)
-        assertEquals(5, restored.blocks.size)
+        assertEquals(6, restored.blocks.size)
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
         assertTrue((restored.blocks[0] as NoteBlock.Text).bold)
         assertTrue((restored.blocks[0] as NoteBlock.Text).underline)
@@ -65,12 +66,14 @@ class NoteModelTest {
         assertEquals(TextAlignment.Center, (restored.blocks[0] as NoteBlock.Text).alignment)
         assertEquals("Ship debug build", (restored.blocks[1] as NoteBlock.Checklist).items[0].text)
         assertTrue((restored.blocks[1] as NoteBlock.Checklist).items[0].checked)
-        assertEquals(2, (restored.blocks[2] as NoteBlock.Drawing).strokes.first().points.size)
-        assertEquals(DrawTool.Highlighter, (restored.blocks[2] as NoteBlock.Drawing).activeTool)
-        assertEquals(DrawTool.Fountain, (restored.blocks[2] as NoteBlock.Drawing).strokes.first().tool)
-        assertEquals("brief.pdf", (restored.blocks[3] as NoteBlock.Attachment).name)
-        assertEquals("2 KB", (restored.blocks[3] as NoteBlock.Attachment).sizeLabel)
-        assertEquals("one.m4a", (restored.blocks[4] as NoteBlock.Audio).name)
+        assertEquals("Call out launch risk", (restored.blocks[2] as NoteBlock.Sticky).text)
+        assertTrue((restored.blocks[2] as NoteBlock.Sticky).collapsed)
+        assertEquals(2, (restored.blocks[3] as NoteBlock.Drawing).strokes.first().points.size)
+        assertEquals(DrawTool.Highlighter, (restored.blocks[3] as NoteBlock.Drawing).activeTool)
+        assertEquals(DrawTool.Fountain, (restored.blocks[3] as NoteBlock.Drawing).strokes.first().tool)
+        assertEquals("brief.pdf", (restored.blocks[4] as NoteBlock.Attachment).name)
+        assertEquals("2 KB", (restored.blocks[4] as NoteBlock.Attachment).sizeLabel)
+        assertEquals("one.m4a", (restored.blocks[5] as NoteBlock.Audio).name)
     }
 
     @Test
@@ -102,6 +105,7 @@ class NoteModelTest {
             blocks = listOf(
                 NoteBlock.Text(text = "Discuss roadmap milestones and launch readiness"),
                 NoteBlock.Checklist(items = listOf(CheckItem(text = "Collect launch assets"))),
+                NoteBlock.Sticky(text = "Launch sticky reminder"),
                 NoteBlock.Attachment(uri = "content://example/deck", name = "launch-deck.pdf", mimeHint = "application/pdf"),
                 NoteBlock.Audio(path = "/audio/launch-briefing.m4a", name = "launch-briefing.m4a")
             )
@@ -112,6 +116,7 @@ class NoteModelTest {
         assertEquals(listOf("Tag: #release"), note.searchMatches("release", SearchScope.Tags).map { it.label })
         assertTrue(note.searchMatches("roadmap", SearchScope.Content).single().label.startsWith("Text:"))
         assertTrue(note.searchMatches("assets", SearchScope.Content).single().label.startsWith("Checklist:"))
+        assertTrue(note.searchMatches("sticky", SearchScope.Content).single().label.startsWith("Sticky:"))
         assertEquals(
             listOf("File: launch-deck.pdf", "Audio: launch-briefing.m4a"),
             note.searchMatches("launch", SearchScope.Attachments).map { it.label }
@@ -138,6 +143,7 @@ class NoteModelTest {
                         CheckItem(text = "Approve budget", checked = true)
                     )
                 ),
+                NoteBlock.Sticky(id = "sticky", text = "Launch sticky reminder"),
                 NoteBlock.Attachment(id = "file", uri = "content://example/file", name = "launch-deck.pdf"),
                 NoteBlock.Audio(id = "audio", path = "/audio/launch-briefing.m4a", name = "launch-briefing.m4a")
             )
@@ -146,13 +152,14 @@ class NoteModelTest {
         val matches = note.editorSearchMatches("launch")
 
         assertEquals(
-            listOf(null, null, null, "text", "checklist", "file", "audio"),
+            listOf(null, null, null, "text", "checklist", "sticky", "file", "audio"),
             matches.map { it.blockId }
         )
         assertEquals("Title", matches[0].label)
         assertEquals("Folder", matches[1].label)
         assertEquals("Tag", matches[2].label)
         assertEquals("Checklist item (open)", matches[4].label)
+        assertEquals("Sticky note", matches[5].label)
         assertTrue(matches.all { it.snippet.contains("launch", ignoreCase = true) })
         assertTrue(note.editorSearchMatches("   ").isEmpty())
     }
@@ -345,6 +352,7 @@ class NoteModelTest {
                     id = "list",
                     items = listOf(CheckItem(id = "item", text = "Task"))
                 ),
+                NoteBlock.Sticky(id = "sticky", text = "Note", collapsed = true),
                 NoteBlock.Drawing(
                     id = "drawing",
                     strokes = listOf(DrawStroke(id = "stroke", color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))
@@ -354,13 +362,19 @@ class NoteModelTest {
 
         val withChecklistCopy = note.duplicateBlockAfter("list")
         val checklistCopy = withChecklistCopy.blocks[2] as NoteBlock.Checklist
+        val withStickyCopy = note.duplicateBlockAfter("sticky")
+        val stickyCopy = withStickyCopy.blocks[3] as NoteBlock.Sticky
         val withDrawingCopy = note.duplicateBlockAfter("drawing")
-        val drawingCopy = withDrawingCopy.blocks[3] as NoteBlock.Drawing
+        val drawingCopy = withDrawingCopy.blocks[4] as NoteBlock.Drawing
 
-        assertEquals(listOf("text", "list", checklistCopy.id, "drawing"), withChecklistCopy.blocks.map { it.id })
+        assertEquals(listOf("text", "list", checklistCopy.id, "sticky", "drawing"), withChecklistCopy.blocks.map { it.id })
         assertTrue(checklistCopy.id != "list")
         assertEquals("Task", checklistCopy.items.single().text)
         assertTrue(checklistCopy.items.single().id != "item")
+        assertEquals(listOf("text", "list", "sticky", stickyCopy.id, "drawing"), withStickyCopy.blocks.map { it.id })
+        assertEquals("Note", stickyCopy.text)
+        assertTrue(stickyCopy.collapsed)
+        assertTrue(stickyCopy.id != "sticky")
         assertTrue(drawingCopy.id != "drawing")
         assertTrue(drawingCopy.strokes.single().id != "stroke")
         assertEquals(note.blocks.map { it.id }, note.duplicateBlockAfter("missing").blocks.map { it.id })
@@ -380,6 +394,7 @@ class NoteModelTest {
                         CheckItem(text = "Follow up", checked = false)
                     )
                 ),
+                NoteBlock.Sticky(text = "Remember stakeholder questions"),
                 NoteBlock.Drawing(strokes = listOf(DrawStroke(color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))),
                 NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
                 NoteBlock.Audio(path = "/audio/review.m4a", name = "review.m4a", durationHintMs = 65_000)
@@ -394,6 +409,7 @@ class NoteModelTest {
         assertTrue(text.contains("Release summary"))
         assertTrue(text.contains("- [x] Demo"))
         assertTrue(text.contains("- [ ] Follow up"))
+        assertTrue(text.contains("[Sticky note] Remember stakeholder questions"))
         assertTrue(text.contains("[Handwriting: 1 stroke]"))
         assertTrue(text.contains("[Attachment: brief.pdf, 2 KB]"))
         assertTrue(text.contains("[Audio: review.m4a, 1:05]"))
@@ -410,6 +426,7 @@ class NoteModelTest {
                         CheckItem(text = "Later", checked = false)
                     )
                 ),
+                NoteBlock.Sticky(text = "alpha sticky note"),
                 NoteBlock.Drawing(strokes = listOf(DrawStroke(color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))),
                 NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
                 NoteBlock.Audio(path = "/audio/review.m4a", name = "review.m4a")
@@ -418,10 +435,11 @@ class NoteModelTest {
 
         val details = note.details()
 
-        assertEquals(5, details.blockCount)
-        assertEquals(3, details.wordCount)
+        assertEquals(6, details.blockCount)
+        assertEquals(6, details.wordCount)
         assertEquals(2, details.checklistItems)
         assertEquals(1, details.completedChecklistItems)
+        assertEquals(1, details.stickyNotes)
         assertEquals(1, details.drawingStrokes)
         assertEquals(1, details.attachments)
         assertEquals(1, details.audioBlocks)

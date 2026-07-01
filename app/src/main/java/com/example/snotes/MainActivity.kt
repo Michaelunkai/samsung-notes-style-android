@@ -242,6 +242,8 @@ data class SNote(
     val preview: String
         get() = blocks.firstOrNull { it is NoteBlock.Text && it.text.isNotBlank() }
             ?.let { (it as NoteBlock.Text).text }
+            ?: blocks.firstOrNull { it is NoteBlock.Sticky && it.text.isNotBlank() }
+                ?.let { (it as NoteBlock.Sticky).text }
             ?: blocks.firstOrNull()?.label.orEmpty()
 }
 
@@ -263,6 +265,13 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         override val id: String = UUID.randomUUID().toString(),
         val items: List<CheckItem> = listOf(CheckItem(text = "Checklist item"))
     ) : NoteBlock(id, "Checklist")
+
+    data class Sticky(
+        override val id: String = UUID.randomUUID().toString(),
+        val text: String = "",
+        val color: Long = 0xFFFFF59D,
+        val collapsed: Boolean = false
+    ) : NoteBlock(id, "Sticky note")
 
     data class Drawing(
         override val id: String = UUID.randomUUID().toString(),
@@ -304,6 +313,7 @@ data class NoteDetails(
     val wordCount: Int,
     val checklistItems: Int,
     val completedChecklistItems: Int,
+    val stickyNotes: Int,
     val drawingStrokes: Int,
     val attachments: Int,
     val audioBlocks: Int
@@ -375,6 +385,14 @@ val DEFAULT_PAPER_COLORS = listOf(
     0xFFFFF8D6L,
     0xFFEFF6FFL,
     0xFFF5F5F4L
+)
+
+val STICKY_NOTE_COLORS = listOf(
+    0xFFFFF59DL,
+    0xFFBBF7D0L,
+    0xFFBFDBFEL,
+    0xFFFBCFE8L,
+    0xFFE9D5FFL
 )
 
 data class NoteDefaults(
@@ -1026,6 +1044,7 @@ fun NoteBlock.duplicateBlock(): NoteBlock = when (this) {
         id = UUID.randomUUID().toString(),
         items = items.map { it.copy(id = UUID.randomUUID().toString()) }
     )
+    is NoteBlock.Sticky -> copy(id = UUID.randomUUID().toString())
     is NoteBlock.Drawing -> copy(
         id = UUID.randomUUID().toString(),
         strokes = strokes.map { stroke -> stroke.copy(id = UUID.randomUUID().toString()) }
@@ -1068,11 +1087,14 @@ fun SNote.details(): NoteDetails = NoteDetails(
     blockCount = blocks.size,
     wordCount = blocks.filterIsInstance<NoteBlock.Text>().sumOf { block ->
         block.text.split(Regex("""\s+""")).count { it.isNotBlank() }
+    } + blocks.filterIsInstance<NoteBlock.Sticky>().sumOf { sticky ->
+        sticky.text.split(Regex("""\s+""")).count { it.isNotBlank() }
     },
     checklistItems = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size },
     completedChecklistItems = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { checklist ->
         checklist.items.count { it.checked }
     },
+    stickyNotes = blocks.count { it is NoteBlock.Sticky },
     drawingStrokes = blocks.filterIsInstance<NoteBlock.Drawing>().sumOf { it.strokes.size },
     attachments = blocks.count { it is NoteBlock.Attachment },
     audioBlocks = blocks.count { it is NoteBlock.Audio }
@@ -1108,6 +1130,7 @@ fun String.wrapLine(maxLineLength: Int): List<String> {
 
 fun NoteBlock.toPlainText(): String = when (this) {
     is NoteBlock.Text -> text.ifBlank { "[Empty text]" }
+    is NoteBlock.Sticky -> "[Sticky note] ${text.ifBlank { "Empty sticky note" }}"
     is NoteBlock.Checklist -> items.joinToString("\n") { item ->
         "${if (item.checked) "- [x]" else "- [ ]"} ${item.text.ifBlank { "Checklist item" }}"
     }
@@ -1971,6 +1994,7 @@ fun BlockBadges(blocks: List<NoteBlock>) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         if (blocks.any { it is NoteBlock.Drawing }) Icon(Icons.Default.Brush, "Drawing", modifier = Modifier.size(18.dp))
         if (blocks.any { it is NoteBlock.Checklist }) Icon(Icons.Default.CheckBox, "Checklist", modifier = Modifier.size(18.dp))
+        if (blocks.any { it is NoteBlock.Sticky }) Icon(Icons.Default.Description, "Sticky note", modifier = Modifier.size(18.dp))
         if (blocks.any { it is NoteBlock.Attachment }) Icon(Icons.Default.AttachFile, "Attachment", modifier = Modifier.size(18.dp))
         if (blocks.any { it is NoteBlock.Audio }) Icon(Icons.Default.AudioFile, "Audio", modifier = Modifier.size(18.dp))
     }
@@ -2107,6 +2131,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                 isRecording = isRecording,
                 onAddText = { viewModel.addBlock(note, NoteBlock.Text()) },
                 onAddChecklist = { viewModel.addBlock(note, NoteBlock.Checklist()) },
+                onAddSticky = { viewModel.addBlock(note, NoteBlock.Sticky()) },
                 onAddDrawing = { viewModel.addBlock(note, NoteBlock.Drawing()) },
                 onAddAttachment = { attachmentLauncher.launch(arrayOf("*/*")) },
                 onRecord = {
@@ -2197,6 +2222,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                         when (block) {
                             is NoteBlock.Text -> TextBlockEditor(note, block, viewModel)
                             is NoteBlock.Checklist -> ChecklistBlockEditor(note, block, viewModel)
+                            is NoteBlock.Sticky -> StickyBlockEditor(note, block, viewModel)
                             is NoteBlock.Drawing -> DrawingBlockEditor(note, block, viewModel)
                             is NoteBlock.Attachment -> AttachmentBlock(note, block, viewModel)
                             is NoteBlock.Audio -> AudioBlock(note, block, viewModel)
@@ -2360,6 +2386,7 @@ fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
                 DetailRow("Blocks", details.blockCount.toString())
                 DetailRow("Words", details.wordCount.toString())
                 DetailRow("Checklist", "${details.completedChecklistItems}/${details.checklistItems} done")
+                DetailRow("Sticky notes", details.stickyNotes.toString())
                 DetailRow("Ink strokes", details.drawingStrokes.toString())
                 DetailRow("Attachments", details.attachments.toString())
                 DetailRow("Audio", details.audioBlocks.toString())
@@ -2514,6 +2541,7 @@ fun EditorToolbar(
     isRecording: Boolean,
     onAddText: () -> Unit,
     onAddChecklist: () -> Unit,
+    onAddSticky: () -> Unit,
     onAddDrawing: () -> Unit,
     onAddAttachment: () -> Unit,
     onRecord: () -> Unit
@@ -2528,6 +2556,7 @@ fun EditorToolbar(
         ) {
             IconButton(onClick = onAddText) { Icon(Icons.Default.TextFields, "Text") }
             IconButton(onClick = onAddChecklist) { Icon(Icons.Default.CheckBox, "Checklist") }
+            IconButton(onClick = onAddSticky) { Icon(Icons.Default.Description, "Sticky note") }
             IconButton(onClick = onAddDrawing) { Icon(Icons.Default.Brush, "Handwriting") }
             IconButton(onClick = onAddAttachment) { Icon(Icons.Default.AttachFile, "Attachment") }
             FilledIconButton(onClick = onRecord) {
@@ -2691,6 +2720,75 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                     inner()
                 }
             )
+        }
+    }
+}
+
+@Composable
+fun StickyBlockEditor(note: SNote, block: NoteBlock.Sticky, viewModel: NotesViewModel) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(block.color))
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(Icons.Default.Description, contentDescription = null, tint = Color(0xFF2B2A27))
+                Text(
+                    "Sticky note",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color(0xFF2B2A27)
+                )
+                TextButton(onClick = { viewModel.updateBlock(note, block.copy(collapsed = !block.collapsed)) }) {
+                    Text(if (block.collapsed) "Expand" else "Minimize", color = Color(0xFF2B2A27))
+                }
+                IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                    Icon(Icons.Default.ContentCopy, "Duplicate sticky note", tint = Color(0xFF2B2A27))
+                }
+                IconButton(onClick = { viewModel.removeBlock(note, block) }) {
+                    Icon(Icons.Default.Delete, "Delete sticky note", tint = Color(0xFF2B2A27))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                STICKY_NOTE_COLORS.forEach { color ->
+                    Box(
+                        Modifier
+                            .size(28.dp)
+                            .background(Color(color), CircleShape)
+                            .border(
+                                width = if (block.color == color) 3.dp else 1.dp,
+                                color = Color(0xFF2B2A27),
+                                shape = CircleShape
+                            )
+                            .clickable { viewModel.updateBlock(note, block.copy(color = color)) }
+                    )
+                }
+            }
+            if (!block.collapsed) {
+                BasicTextField(
+                    value = block.text,
+                    onValueChange = { viewModel.updateBlock(note, block.copy(text = it)) },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF2B2A27)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .background(Color.White.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color(0x802B2A27), RoundedCornerShape(6.dp))
+                        .padding(10.dp),
+                    decorationBox = { inner ->
+                        if (block.text.isBlank()) Text("Sticky note text", color = Color(0xFF5F5A4D))
+                        inner()
+                    }
+                )
+            } else {
+                Text(
+                    block.text.ifBlank { "Collapsed sticky note" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF2B2A27),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -3272,6 +3370,9 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
                         val status = if (item.checked) "done" else "open"
                         add(EditorSearchMatch(block.id, "Checklist item ($status)", item.text.searchSnippet(normalized)))
                     }
+                is NoteBlock.Sticky -> if (block.text.contains(normalized, ignoreCase = true)) {
+                    add(EditorSearchMatch(block.id, "Sticky note", block.text.searchSnippet(normalized)))
+                }
                 is NoteBlock.Attachment -> if (
                     block.name.contains(normalized, ignoreCase = true) ||
                     block.mimeHint.contains(normalized, ignoreCase = true)
@@ -3292,6 +3393,7 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
 
 fun NoteBlock.contentSearchLabels(query: String): List<String> = when (this) {
     is NoteBlock.Text -> if (text.contains(query, ignoreCase = true)) listOf("Text: ${text.searchSnippet(query)}") else emptyList()
+    is NoteBlock.Sticky -> if (text.contains(query, ignoreCase = true)) listOf("Sticky: ${text.searchSnippet(query)}") else emptyList()
     is NoteBlock.Checklist -> items
         .filter { it.text.contains(query, ignoreCase = true) }
         .map { "Checklist: ${it.text.searchSnippet(query)}" }
@@ -3444,6 +3546,12 @@ fun NoteBlock.toJson(): JSONObject {
                 }
             })
 
+        is NoteBlock.Sticky -> json
+            .put("type", "sticky")
+            .put("text", text)
+            .put("color", color)
+            .put("collapsed", collapsed)
+
         is NoteBlock.Drawing -> json
             .put("type", "drawing")
             .put("activeTool", activeTool.name)
@@ -3518,6 +3626,13 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
     "checklist" -> NoteBlock.Checklist(
         id = optString("id", UUID.randomUUID().toString()),
         items = optJSONArray("items").toCheckItems().ifEmpty { listOf(CheckItem(text = "")) }
+    )
+
+    "sticky" -> NoteBlock.Sticky(
+        id = optString("id", UUID.randomUUID().toString()),
+        text = optString("text"),
+        color = optLong("color", STICKY_NOTE_COLORS.first()),
+        collapsed = optBoolean("collapsed", false)
     )
 
     "drawing" -> NoteBlock.Drawing(
