@@ -232,6 +232,8 @@ data class ChecklistProgress(val done: Int, val total: Int) {
         get() = "$done/$total done"
 }
 
+data class SearchMatch(val scope: SearchScope, val label: String)
+
 data class DrawPoint(val x: Float, val y: Float)
 
 data class DrawStroke(
@@ -266,6 +268,7 @@ data class NotesUiState(
     val surface: NotesSurface = NotesSurface.All,
     val sortMode: NoteSortMode = NoteSortMode.ModifiedNewest,
     val viewMode: NoteViewMode = NoteViewMode.List,
+    val searchScope: SearchScope = SearchScope.All,
     val statusMessage: String? = null,
     val darkMode: Boolean = false
 ) {
@@ -280,13 +283,7 @@ data class NotesUiState(
             }
             .filter { note -> folderFilter == null || note.folder == folderFilter || note.folder.startsWith("$folderFilter/") }
             .filter { note -> tagFilter == null || tagFilter in note.tags }
-            .filter { note ->
-                search.isBlank() ||
-                    note.title.contains(search, ignoreCase = true) ||
-                    (!note.locked && note.preview.contains(search, ignoreCase = true)) ||
-                    note.tags.any { it.contains(search, ignoreCase = true) } ||
-                    note.folder.contains(search, ignoreCase = true)
-            }
+            .filter { note -> search.isBlank() || note.searchMatches(search, searchScope).isNotEmpty() }
             .sortedWith(sortMode.comparator)
 
     val selectedNote: SNote?
@@ -320,6 +317,15 @@ enum class NotesSurface(val label: String) {
     Tags("Tags"),
     Favorites("Favorites"),
     Trash("Trash")
+}
+
+enum class SearchScope(val label: String) {
+    All("All"),
+    Title("Title"),
+    Content("Content"),
+    Folders("Folders"),
+    Tags("Tags"),
+    Attachments("Files")
 }
 
 enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
@@ -392,6 +398,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSearch(search: String) {
         _state.update { it.copy(search = search) }
+    }
+
+    fun setSearchScope(searchScope: SearchScope) {
+        _state.update { it.copy(searchScope = searchScope) }
     }
 
     fun filterFolder(folder: String?) {
@@ -835,9 +845,13 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                 value = state.search,
                 onValueChange = viewModel::setSearch,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                placeholder = { Text("Search title, text, folder, or tag") },
+                placeholder = { Text("Search notes") },
                 singleLine = true
             )
+            if (state.search.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                SearchScopeChips(state, viewModel)
+            }
             Spacer(Modifier.height(12.dp))
             state.statusMessage?.let { message ->
                 AssistChip(
@@ -875,6 +889,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             note = note,
                             inTrash = state.surface == NotesSurface.Trash,
                             selected = note.id in state.selectedNoteIds,
+                            search = state.search,
+                            searchScope = state.searchScope,
                             onClick = {
                                 if (state.isSelectionMode) {
                                     viewModel.toggleNoteSelection(note.id)
@@ -905,6 +921,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             note = note,
                             inTrash = state.surface == NotesSurface.Trash,
                             selected = note.id in state.selectedNoteIds,
+                            search = state.search,
+                            searchScope = state.searchScope,
                             onClick = {
                                 if (state.isSelectionMode) {
                                     viewModel.toggleNoteSelection(note.id)
@@ -926,6 +944,20 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SearchScopeChips(state: NotesUiState, viewModel: NotesViewModel) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SearchScope.entries.forEach { scope ->
+            FilterChip(
+                selected = state.searchScope == scope,
+                onClick = { viewModel.setSearchScope(scope) },
+                label = { Text(scope.label) }
+            )
         }
     }
 }
@@ -1013,6 +1045,8 @@ fun NoteCard(
     note: SNote,
     inTrash: Boolean,
     selected: Boolean,
+    search: String,
+    searchScope: SearchScope,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -1022,6 +1056,7 @@ fun NoteCard(
     onPermanentDelete: () -> Unit
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val matches = remember(note, search, searchScope) { note.searchMatches(search, searchScope) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1120,6 +1155,16 @@ fun NoteCard(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (search.isNotBlank() && matches.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    matches.joinToString(" • ") { it.label },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 AssistChip(onClick = {}, label = { Text(note.folder) }, leadingIcon = { Icon(Icons.Default.Folder, null) })
@@ -1926,6 +1971,73 @@ fun formatDuration(durationMs: Long): String {
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
+}
+
+fun SNote.searchMatches(query: String, scope: SearchScope = SearchScope.All): List<SearchMatch> {
+    val normalized = query.trim()
+    if (normalized.isBlank()) return emptyList()
+    val matches = buildList {
+        if (scope.includes(SearchScope.Title) && title.contains(normalized, ignoreCase = true)) {
+            add(SearchMatch(SearchScope.Title, "Title: $title"))
+        }
+        if (scope.includes(SearchScope.Folders) && folder.contains(normalized, ignoreCase = true)) {
+            add(SearchMatch(SearchScope.Folders, "Folder: $folder"))
+        }
+        if (scope.includes(SearchScope.Tags)) {
+            tags.filter { it.contains(normalized, ignoreCase = true) }
+                .take(3)
+                .forEach { add(SearchMatch(SearchScope.Tags, "Tag: #$it")) }
+        }
+        if (!locked && scope.includes(SearchScope.Content)) {
+            blocks.flatMap { it.contentSearchLabels(normalized) }
+                .take(4)
+                .forEach { add(SearchMatch(SearchScope.Content, it)) }
+        }
+        if (!locked && scope.includes(SearchScope.Attachments)) {
+            blocks.flatMap { it.attachmentSearchLabels(normalized) }
+                .take(4)
+                .forEach { add(SearchMatch(SearchScope.Attachments, it)) }
+        }
+    }
+    return matches.distinctBy { it.scope to it.label }
+}
+
+fun SearchScope.includes(candidate: SearchScope): Boolean =
+    this == SearchScope.All || this == candidate
+
+fun NoteBlock.contentSearchLabels(query: String): List<String> = when (this) {
+    is NoteBlock.Text -> if (text.contains(query, ignoreCase = true)) listOf("Text: ${text.searchSnippet(query)}") else emptyList()
+    is NoteBlock.Checklist -> items
+        .filter { it.text.contains(query, ignoreCase = true) }
+        .map { "Checklist: ${it.text.searchSnippet(query)}" }
+    else -> emptyList()
+}
+
+fun NoteBlock.attachmentSearchLabels(query: String): List<String> = when (this) {
+    is NoteBlock.Attachment -> if (
+        name.contains(query, ignoreCase = true) ||
+        mimeHint.contains(query, ignoreCase = true)
+    ) {
+        listOf("File: $name")
+    } else {
+        emptyList()
+    }
+    is NoteBlock.Audio -> if (name.contains(query, ignoreCase = true) || path.contains(query, ignoreCase = true)) {
+        listOf("Audio: $name")
+    } else {
+        emptyList()
+    }
+    else -> emptyList()
+}
+
+fun String.searchSnippet(query: String, radius: Int = 28): String {
+    val index = indexOf(query, ignoreCase = true)
+    if (index < 0) return take(radius * 2)
+    val start = (index - radius).coerceAtLeast(0)
+    val end = (index + query.length + radius).coerceAtMost(length)
+    val prefix = if (start > 0) "..." else ""
+    val suffix = if (end < length) "..." else ""
+    return prefix + substring(start, end).trim() + suffix
 }
 
 fun List<SNote>.updateByIds(ids: Set<String>, transform: (SNote) -> SNote): List<SNote> =

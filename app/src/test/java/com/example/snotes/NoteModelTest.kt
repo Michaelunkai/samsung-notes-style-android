@@ -82,6 +82,36 @@ class NoteModelTest {
     }
 
     @Test
+    fun searchScopesMatchContentMetadataAndAttachments() {
+        val note = SNote(
+            title = "Launch plan",
+            folder = "Work/Product",
+            tags = listOf("release", "team"),
+            blocks = listOf(
+                NoteBlock.Text(text = "Discuss roadmap milestones and launch readiness"),
+                NoteBlock.Checklist(items = listOf(CheckItem(text = "Collect launch assets"))),
+                NoteBlock.Attachment(uri = "content://example/deck", name = "launch-deck.pdf", mimeHint = "application/pdf"),
+                NoteBlock.Audio(path = "/audio/launch-briefing.m4a", name = "launch-briefing.m4a")
+            )
+        )
+
+        assertEquals(SearchScope.Title, note.searchMatches("launch", SearchScope.Title).single().scope)
+        assertEquals(listOf("Folder: Work/Product"), note.searchMatches("product", SearchScope.Folders).map { it.label })
+        assertEquals(listOf("Tag: #release"), note.searchMatches("release", SearchScope.Tags).map { it.label })
+        assertTrue(note.searchMatches("roadmap", SearchScope.Content).single().label.startsWith("Text:"))
+        assertTrue(note.searchMatches("assets", SearchScope.Content).single().label.startsWith("Checklist:"))
+        assertEquals(
+            listOf("File: launch-deck.pdf", "Audio: launch-briefing.m4a"),
+            note.searchMatches("launch", SearchScope.Attachments).map { it.label }
+        )
+
+        val locked = note.copy(locked = true)
+        assertTrue(locked.searchMatches("roadmap", SearchScope.Content).isEmpty())
+        assertTrue(locked.searchMatches("launch-deck", SearchScope.Attachments).isEmpty())
+        assertEquals(SearchScope.Title, locked.searchMatches("Launch", SearchScope.Title).single().scope)
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",
