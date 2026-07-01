@@ -106,4 +106,44 @@ class NoteModelTest {
         assertEquals("lecture.m4a", (restored.blocks[1] as NoteBlock.Audio).name)
         assertEquals(2, (restored.blocks[2] as NoteBlock.Drawing).strokes.single().points.size)
     }
+
+    @Test
+    fun surfacesExposeFavoritesTrashAndNestedFolders() {
+        val notes = listOf(
+            SNote(title = "Root", folder = "School", favorite = true, updatedAt = 3),
+            SNote(title = "Child", folder = "School/Physics", updatedAt = 2),
+            SNote(title = "Trash", folder = "School", deleted = true, updatedAt = 4),
+            SNote(title = "Work", folder = "Work", updatedAt = 1)
+        )
+
+        val folderState = NotesUiState(notes = notes, surface = NotesSurface.Folders, folderFilter = "School")
+        assertEquals(listOf("Root", "Child"), folderState.visibleNotes.map { it.title })
+        assertEquals(listOf("School", "Work"), folderState.rootFolders)
+
+        val favoritesState = NotesUiState(notes = notes, surface = NotesSurface.Favorites)
+        assertEquals(listOf("Root"), favoritesState.visibleNotes.map { it.title })
+        assertEquals(1, favoritesState.favoritesCount)
+
+        val trashState = NotesUiState(notes = notes, surface = NotesSurface.Trash)
+        assertEquals(listOf("Trash"), trashState.visibleNotes.map { it.title })
+        assertEquals(1, trashState.trashCount)
+    }
+
+    @Test
+    fun sortModesControlVisibleNoteOrdering() {
+        val notes = listOf(
+            SNote(title = "Beta", folder = "B", createdAt = 1, updatedAt = 1),
+            SNote(title = "Alpha", folder = "A", createdAt = 3, updatedAt = 3),
+            SNote(title = "Favorite", folder = "Z", favorite = true, createdAt = 2, updatedAt = 2)
+        )
+
+        val titleState = NotesUiState(notes = notes, sortMode = NoteSortMode.TitleAscending)
+        assertEquals(listOf("Favorite", "Alpha", "Beta"), titleState.visibleNotes.map { it.title })
+
+        val createdState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedNewest)
+        assertEquals(listOf("Favorite", "Alpha", "Beta"), createdState.visibleNotes.map { it.title })
+
+        val folderState = NotesUiState(notes = notes, sortMode = NoteSortMode.FolderAscending)
+        assertEquals(listOf("Favorite", "Alpha", "Beta"), folderState.visibleNotes.map { it.title })
+    }
 }

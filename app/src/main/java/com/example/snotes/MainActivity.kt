@@ -35,6 +35,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -219,12 +222,21 @@ data class NotesUiState(
     val search: String = "",
     val folderFilter: String? = null,
     val tagFilter: String? = null,
+    val surface: NotesSurface = NotesSurface.All,
+    val sortMode: NoteSortMode = NoteSortMode.ModifiedNewest,
+    val viewMode: NoteViewMode = NoteViewMode.List,
     val darkMode: Boolean = false
 ) {
     val visibleNotes: List<SNote>
         get() = notes
-            .filter { !it.deleted }
-            .filter { note -> folderFilter == null || note.folder == folderFilter }
+            .filter { note ->
+                when (surface) {
+                    NotesSurface.All, NotesSurface.Folders, NotesSurface.Tags -> !note.deleted
+                    NotesSurface.Favorites -> !note.deleted && note.favorite
+                    NotesSurface.Trash -> note.deleted
+                }
+            }
+            .filter { note -> folderFilter == null || note.folder == folderFilter || note.folder.startsWith("$folderFilter/") }
             .filter { note -> tagFilter == null || tagFilter in note.tags }
             .filter { note ->
                 search.isBlank() ||
@@ -233,7 +245,7 @@ data class NotesUiState(
                     note.tags.any { it.contains(search, ignoreCase = true) } ||
                     note.folder.contains(search, ignoreCase = true)
             }
-            .sortedWith(compareByDescending<SNote> { it.favorite }.thenByDescending { it.updatedAt })
+            .sortedWith(sortMode.comparator)
 
     val selectedNote: SNote?
         get() = notes.firstOrNull { it.id == selectedNoteId }
@@ -241,8 +253,49 @@ data class NotesUiState(
     val folders: List<String>
         get() = notes.filter { !it.deleted }.map { it.folder }.distinct().sorted()
 
+    val rootFolders: List<String>
+        get() = folders.map { it.substringBefore("/") }.distinct().sorted()
+
     val tags: List<String>
         get() = notes.filter { !it.deleted }.flatMap { it.tags }.distinct().sorted()
+
+    val trashCount: Int
+        get() = notes.count { it.deleted }
+
+    val favoritesCount: Int
+        get() = notes.count { !it.deleted && it.favorite }
+}
+
+enum class NotesSurface(val label: String) {
+    All("All notes"),
+    Folders("Folders"),
+    Tags("Tags"),
+    Favorites("Favorites"),
+    Trash("Trash")
+}
+
+enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
+    ModifiedNewest(
+        "Date modified",
+        compareByDescending<SNote> { it.favorite }.thenByDescending { it.updatedAt }
+    ),
+    CreatedNewest(
+        "Date created",
+        compareByDescending<SNote> { it.favorite }.thenByDescending { it.createdAt }
+    ),
+    TitleAscending(
+        "Title",
+        compareByDescending<SNote> { it.favorite }.thenBy { it.title.lowercase() }
+    ),
+    FolderAscending(
+        "Folder",
+        compareByDescending<SNote> { it.favorite }.thenBy { it.folder.lowercase() }.thenBy { it.title.lowercase() }
+    )
+}
+
+enum class NoteViewMode(val label: String) {
+    List("List"),
+    Grid("Grid")
 }
 
 class NotesViewModel(application: Application) : AndroidViewModel(application) {
@@ -283,11 +336,32 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun filterFolder(folder: String?) {
-        _state.update { it.copy(folderFilter = folder, tagFilter = null) }
+        _state.update { it.copy(surface = if (folder == null) NotesSurface.All else NotesSurface.Folders, folderFilter = folder, tagFilter = null) }
     }
 
     fun filterTag(tag: String?) {
-        _state.update { it.copy(tagFilter = tag, folderFilter = null) }
+        _state.update { it.copy(surface = if (tag == null) NotesSurface.All else NotesSurface.Tags, tagFilter = tag, folderFilter = null) }
+    }
+
+    fun setSurface(surface: NotesSurface) {
+        _state.update {
+            when (surface) {
+                NotesSurface.All -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
+                NotesSurface.Favorites, NotesSurface.Trash -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
+                NotesSurface.Folders -> it.copy(surface = surface, tagFilter = null, folderFilter = it.folderFilter ?: it.rootFolders.firstOrNull() ?: it.folders.firstOrNull())
+                NotesSurface.Tags -> it.copy(surface = surface, folderFilter = null, tagFilter = it.tagFilter ?: it.tags.firstOrNull())
+            }
+        }
+    }
+
+    fun setSortMode(sortMode: NoteSortMode) {
+        _state.update { it.copy(sortMode = sortMode) }
+    }
+
+    fun toggleViewMode() {
+        _state.update {
+            it.copy(viewMode = if (it.viewMode == NoteViewMode.List) NoteViewMode.Grid else NoteViewMode.List)
+        }
     }
 
     fun toggleTheme() {
@@ -329,6 +403,20 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteNote(note: SNote) {
         updateNote(note.copy(deleted = true))
         _state.update { it.copy(selectedNoteId = null) }
+    }
+
+    fun restoreNote(note: SNote) {
+        updateNote(note.copy(deleted = false))
+    }
+
+    fun permanentlyDeleteNote(note: SNote) {
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.filterNot { it.id == note.id },
+                selectedNoteId = state.selectedNoteId.takeUnless { it == note.id }
+            )
+        }
+        persist()
     }
 
     fun addBlock(note: SNote, block: NoteBlock) {
@@ -440,10 +528,11 @@ fun NotesApp(viewModel: NotesViewModel, initialSharedText: String? = null) {
 @Composable
 fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
     var createMenuOpen by remember { mutableStateOf(false) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Notes") },
+                title = { Text(state.surface.label) },
                 actions = {
                     IconButton(onClick = viewModel::toggleTheme) {
                         Icon(
@@ -452,8 +541,35 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                         )
                     }
                     Box {
-                        IconButton(onClick = { createMenuOpen = true }) {
+                        IconButton(onClick = { sortMenuOpen = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("View: ${state.viewMode.label}") },
+                                leadingIcon = { Icon(Icons.Default.Description, null) },
+                                onClick = {
+                                    sortMenuOpen = false
+                                    viewModel.toggleViewMode()
+                                }
+                            )
+                            NoteSortMode.entries.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = { Text("Sort: ${mode.label}") },
+                                    leadingIcon = {
+                                        if (state.sortMode == mode) Icon(Icons.Default.CheckBox, null)
+                                    },
+                                    onClick = {
+                                        sortMenuOpen = false
+                                        viewModel.setSortMode(mode)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Box {
+                        IconButton(onClick = { createMenuOpen = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "Create")
                         }
                         DropdownMenu(expanded = createMenuOpen, onDismissRequest = { createMenuOpen = false }) {
                             DropdownMenuItem(
@@ -495,20 +611,32 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = state.folderFilter == null && state.tagFilter == null,
-                    onClick = { viewModel.filterFolder(null) },
+                    selected = state.surface == NotesSurface.All,
+                    onClick = { viewModel.setSurface(NotesSurface.All) },
                     icon = { Icon(Icons.Default.Description, contentDescription = null) },
                     label = { Text("All") }
                 )
                 NavigationBarItem(
-                    selected = state.folderFilter != null,
-                    onClick = { viewModel.filterFolder(state.folders.firstOrNull()) },
+                    selected = state.surface == NotesSurface.Folders,
+                    onClick = { viewModel.setSurface(NotesSurface.Folders) },
                     icon = { Icon(Icons.Default.Folder, contentDescription = null) },
                     label = { Text("Folders") }
                 )
                 NavigationBarItem(
-                    selected = state.tagFilter != null,
-                    onClick = { viewModel.filterTag(state.tags.firstOrNull()) },
+                    selected = state.surface == NotesSurface.Favorites,
+                    onClick = { viewModel.setSurface(NotesSurface.Favorites) },
+                    icon = { Icon(Icons.Default.Favorite, contentDescription = null) },
+                    label = { Text("Favorites") }
+                )
+                NavigationBarItem(
+                    selected = state.surface == NotesSurface.Trash,
+                    onClick = { viewModel.setSurface(NotesSurface.Trash) },
+                    icon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    label = { Text("Trash") }
+                )
+                NavigationBarItem(
+                    selected = state.surface == NotesSurface.Tags,
+                    onClick = { viewModel.setSurface(NotesSurface.Tags) },
                     icon = { Icon(Icons.Default.Tag, contentDescription = null) },
                     label = { Text("Tags") }
                 )
@@ -532,12 +660,47 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
             Spacer(Modifier.height(12.dp))
             FilterRail(state, viewModel)
             Spacer(Modifier.height(12.dp))
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 96.dp)
-            ) {
-                items(state.visibleNotes, key = { it.id }) { note ->
-                    NoteCard(note, onClick = { viewModel.selectNote(note.id) })
+            Text(
+                text = "${state.visibleNotes.size} notes • ${state.sortMode.label} • ${state.viewMode.label}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            if (state.viewMode == NoteViewMode.Grid) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 170.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 96.dp)
+                ) {
+                    gridItems(state.visibleNotes, key = { it.id }) { note ->
+                        NoteCard(
+                            note = note,
+                            inTrash = state.surface == NotesSurface.Trash,
+                            onClick = { if (!note.deleted) viewModel.selectNote(note.id) },
+                            onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onMoveToTrash = { viewModel.deleteNote(note) },
+                            onRestore = { viewModel.restoreNote(note) },
+                            onPermanentDelete = { viewModel.permanentlyDeleteNote(note) }
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 96.dp)
+                ) {
+                    items(state.visibleNotes, key = { it.id }) { note ->
+                        NoteCard(
+                            note = note,
+                            inTrash = state.surface == NotesSurface.Trash,
+                            onClick = { if (!note.deleted) viewModel.selectNote(note.id) },
+                            onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onMoveToTrash = { viewModel.deleteNote(note) },
+                            onRestore = { viewModel.restoreNote(note) },
+                            onPermanentDelete = { viewModel.permanentlyDeleteNote(note) }
+                        )
+                    }
                 }
             }
         }
@@ -549,20 +712,38 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
 fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(
-            selected = state.folderFilter == null && state.tagFilter == null,
-            onClick = {
-                viewModel.filterFolder(null)
-                viewModel.filterTag(null)
-            },
-            label = { Text("All notes") }
+            selected = state.surface == NotesSurface.All,
+            onClick = { viewModel.setSurface(NotesSurface.All) },
+            label = { Text("All notes") },
+            leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) }
         )
-        state.folders.forEach { folder ->
-            FilterChip(
-                selected = state.folderFilter == folder,
-                onClick = { viewModel.filterFolder(folder) },
-                label = { Text(folder) },
-                leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
-            )
+        FilterChip(
+            selected = state.surface == NotesSurface.Favorites,
+            onClick = { viewModel.setSurface(NotesSurface.Favorites) },
+            label = { Text("Favorites ${state.favoritesCount}") },
+            leadingIcon = { Icon(Icons.Default.Favorite, contentDescription = null, modifier = Modifier.size(16.dp)) }
+        )
+        FilterChip(
+            selected = state.surface == NotesSurface.Trash,
+            onClick = { viewModel.setSurface(NotesSurface.Trash) },
+            label = { Text("Trash ${state.trashCount}") },
+            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp)) }
+        )
+        val folderChips = if (state.surface == NotesSurface.Folders && state.folderFilter != null) {
+            state.folders
+        } else {
+            state.rootFolders
+        }
+        folderChips.forEach { folder ->
+            val childCount = state.notes.count { !it.deleted && (it.folder == folder || it.folder.startsWith("$folder/")) }
+            if (childCount > 0) {
+                FilterChip(
+                    selected = state.folderFilter == folder,
+                    onClick = { viewModel.filterFolder(folder) },
+                    label = { Text("$folder $childCount") },
+                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                )
+            }
         }
         state.tags.forEach { tag ->
             FilterChip(
@@ -577,7 +758,16 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NoteCard(note: SNote, onClick: () -> Unit) {
+fun NoteCard(
+    note: SNote,
+    inTrash: Boolean,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onMoveToTrash: () -> Unit,
+    onRestore: () -> Unit,
+    onPermanentDelete: () -> Unit
+) {
+    var menuOpen by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -595,6 +785,48 @@ fun NoteCard(note: SNote, onClick: () -> Unit) {
                     modifier = Modifier.weight(1f)
                 )
                 if (note.favorite) Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color(0xFFE3A008))
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Note actions")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        if (inTrash) {
+                            DropdownMenuItem(
+                                text = { Text("Restore") },
+                                leadingIcon = { Icon(Icons.Default.Description, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onRestore()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete permanently") },
+                                leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onPermanentDelete()
+                                }
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text(if (note.favorite) "Remove favorite" else "Add favorite") },
+                                leadingIcon = { Icon(Icons.Default.Favorite, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onToggleFavorite()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Move to Trash") },
+                                leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onMoveToTrash()
+                                }
+                            )
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(6.dp))
             Text(note.preview, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)

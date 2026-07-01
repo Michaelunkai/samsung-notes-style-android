@@ -8,7 +8,7 @@ lifecycle = "2.8.7"
 junit = "4.13.2"
 json = "20240303"
 ksp = "2.0.21-1.0.28"
-room = "2.8.4"
+room = "2.7.2"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
