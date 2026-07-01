@@ -17,6 +17,7 @@ Native Android prototype for a Samsung Notes-style note-taking app.
 - Attachment blocks using Android's document picker, FileProvider-backed camera capture, image previews, file metadata, and open-with-Android viewer actions.
 - Audio recording blocks using `MediaRecorder`, runtime microphone permission, playback, and shared audio import as playable audio blocks.
 - Local offline-first Room persistence with a first-run migration path from the legacy JSON note store.
+- Row-level Room upserts for normal note edits to avoid rewriting the whole note table during editor changes.
 - Local Notes PIN support for locked notes, with locked previews hidden from search and widgets.
 - JSON backup export/import plus per-note plain text export/share and PDF export.
 - Android share targets for incoming text, images, PDFs, generic files, and audio.

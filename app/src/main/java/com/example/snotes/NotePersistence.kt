@@ -55,6 +55,9 @@ interface NoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(notes: List<NoteEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(note: NoteEntity)
+
     @Query("DELETE FROM notes")
     suspend fun deleteAll()
 
@@ -90,6 +93,12 @@ class RoomNoteRepository(context: Context) {
     suspend fun save(notes: List<SNote>) {
         mutex.withLock {
             database.noteDao().replaceAll(notes.map { it.toEntity() })
+        }
+    }
+
+    suspend fun saveNote(note: SNote) {
+        mutex.withLock {
+            database.noteDao().upsert(note.toEntity())
         }
     }
 

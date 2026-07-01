@@ -714,12 +714,13 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateNote(note: SNote) {
+        val updated = note.copy(updatedAt = System.currentTimeMillis())
         _state.update { state ->
             state.copy(notes = state.notes.map {
-                if (it.id == note.id) note.copy(updatedAt = System.currentTimeMillis()) else it
+                if (it.id == note.id) updated else it
             })
         }
-        persist()
+        persistNote(updated)
     }
 
     fun updateTitle(note: SNote, title: String) {
@@ -957,6 +958,13 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         val notes = _state.value.notes
         viewModelScope.launch(Dispatchers.IO) {
             repository.save(notes)
+            refreshNotesWidgets(getApplication())
+        }
+    }
+
+    private fun persistNote(note: SNote) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveNote(note)
             refreshNotesWidgets(getApplication())
         }
     }
