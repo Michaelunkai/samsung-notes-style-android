@@ -2661,6 +2661,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var pendingPdfExportNote by remember { mutableStateOf<SNote?>(null) }
     var pendingCameraCapture by remember { mutableStateOf<CameraCaptureTarget?>(null) }
     var detailsOpen by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
     var editorSearchOpen by remember { mutableStateOf(false) }
     var editorSearchQuery by remember(note.id) { mutableStateOf("") }
     var activeSearchMatch by remember(note.id) { mutableStateOf(0) }
@@ -2739,6 +2740,14 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
         }
     }
 
+    if (settingsOpen) {
+        SettingsDialog(
+            state = state,
+            viewModel = viewModel,
+            onDismiss = { settingsOpen = false }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -2802,7 +2811,16 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                             contentDescription = "Favorite"
                         )
                     }
-                    IconButton(onClick = { viewModel.toggleLocked(note) }) {
+                    IconButton(
+                        onClick = {
+                            if (!note.locked && !state.hasNotePin) {
+                                settingsOpen = true
+                                viewModel.setStatus("Set a Notes PIN to lock notes")
+                            } else {
+                                viewModel.toggleLocked(note)
+                            }
+                        }
+                    ) {
                         Icon(Icons.Default.Lock, contentDescription = "Lock note")
                     }
                     IconButton(onClick = { viewModel.deleteNote(note) }) {
