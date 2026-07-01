@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
@@ -558,6 +559,12 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         updateNote(note.copy(pinned = !note.pinned))
     }
 
+    fun duplicateNote(note: SNote) {
+        val duplicate = note.duplicate()
+        _state.update { it.copy(notes = listOf(duplicate) + it.notes, selectedNoteId = duplicate.id, selectedNoteIds = emptySet()) }
+        persist()
+    }
+
     fun toggleLocked(note: SNote) {
         val locked = !note.locked
         updateNote(note.copy(locked = locked))
@@ -738,6 +745,34 @@ fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()):
         pageTemplate = defaults.pageTemplate,
         paperColor = defaults.paperColor
     )
+}
+
+fun SNote.duplicate(now: Long = System.currentTimeMillis()): SNote = copy(
+    id = UUID.randomUUID().toString(),
+    title = duplicateTitle(title),
+    blocks = blocks.map { it.duplicateBlock() },
+    pinned = false,
+    favorite = false,
+    deleted = false,
+    createdAt = now,
+    updatedAt = now
+)
+
+fun duplicateTitle(title: String): String =
+    if (title.startsWith("Copy of ")) "$title copy" else "Copy of $title"
+
+fun NoteBlock.duplicateBlock(): NoteBlock = when (this) {
+    is NoteBlock.Text -> copy(id = UUID.randomUUID().toString())
+    is NoteBlock.Checklist -> copy(
+        id = UUID.randomUUID().toString(),
+        items = items.map { it.copy(id = UUID.randomUUID().toString()) }
+    )
+    is NoteBlock.Drawing -> copy(
+        id = UUID.randomUUID().toString(),
+        strokes = strokes.map { stroke -> stroke.copy(id = UUID.randomUUID().toString()) }
+    )
+    is NoteBlock.Attachment -> copy(id = UUID.randomUUID().toString())
+    is NoteBlock.Audio -> copy(id = UUID.randomUUID().toString())
 }
 
 fun Intent.toNoteLaunchRequest(): NoteLaunchRequest =
@@ -1046,6 +1081,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
+                            onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onToggleLock = { viewModel.toggleLocked(note) },
@@ -1079,6 +1115,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
+                            onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onToggleLock = { viewModel.toggleLocked(note) },
@@ -1197,6 +1234,7 @@ fun NoteCard(
     searchScope: SearchScope,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onDuplicate: () -> Unit,
     onTogglePinned: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleLock: () -> Unit,
@@ -1268,6 +1306,14 @@ fun NoteCard(
                                 onClick = {
                                     menuOpen = false
                                     onLongClick()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Duplicate") },
+                                leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onDuplicate()
                                 }
                             )
                             DropdownMenuItem(
@@ -1404,6 +1450,9 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                             contentDescription = "Pin note",
                             tint = if (note.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    IconButton(onClick = { viewModel.duplicateNote(note) }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate note")
                     }
                     IconButton(onClick = { viewModel.toggleFavorite(note) }) {
                         Icon(

@@ -168,6 +168,47 @@ class NoteModelTest {
     }
 
     @Test
+    fun duplicateNoteCreatesIndependentCopyWithFreshMetadata() {
+        val original = SNote(
+            id = "source",
+            title = "Design brief",
+            folder = "Work",
+            tags = listOf("copy"),
+            pinned = true,
+            favorite = true,
+            deleted = true,
+            createdAt = 1,
+            updatedAt = 2,
+            blocks = listOf(
+                NoteBlock.Text(id = "text", text = "Body"),
+                NoteBlock.Checklist(
+                    id = "checklist",
+                    items = listOf(CheckItem(id = "item", text = "Task", checked = true))
+                ),
+                NoteBlock.Drawing(
+                    id = "drawing",
+                    strokes = listOf(DrawStroke(id = "stroke", color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 2f))))
+                )
+            )
+        )
+
+        val duplicate = original.duplicate(now = 42)
+
+        assertEquals("Copy of Design brief", duplicate.title)
+        assertEquals("Work", duplicate.folder)
+        assertEquals(listOf("copy"), duplicate.tags)
+        assertFalse(duplicate.pinned)
+        assertFalse(duplicate.favorite)
+        assertFalse(duplicate.deleted)
+        assertEquals(42, duplicate.createdAt)
+        assertEquals(42, duplicate.updatedAt)
+        assertTrue(duplicate.id != original.id)
+        assertTrue(duplicate.blocks[0].id != original.blocks[0].id)
+        assertTrue((duplicate.blocks[1] as NoteBlock.Checklist).items.single().id != "item")
+        assertTrue((duplicate.blocks[2] as NoteBlock.Drawing).strokes.single().id != "stroke")
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",
