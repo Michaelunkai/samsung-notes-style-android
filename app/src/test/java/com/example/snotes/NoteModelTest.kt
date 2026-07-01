@@ -765,6 +765,25 @@ class NoteModelTest {
     }
 
     @Test
+    fun removeFolderFromNotesMovesFolderContentsWithoutDeletingNotes() {
+        val notes = listOf(
+            SNote(id = "root", folder = "Work"),
+            SNote(id = "child", folder = "Work/Product"),
+            SNote(id = "other", folder = "Homework"),
+            SNote(id = "deleted", folder = "Work", deleted = true)
+        )
+
+        val updated = notes.removeFolderFromNotes("Work")
+
+        assertEquals(listOf("root", "child", "other", "deleted"), updated.map { it.id })
+        assertEquals("All notes", updated.first { it.id == "root" }.folder)
+        assertEquals("All notes", updated.first { it.id == "child" }.folder)
+        assertEquals("Homework", updated.first { it.id == "other" }.folder)
+        assertEquals("All notes", updated.first { it.id == "deleted" }.folder)
+        assertTrue(updated.first { it.id == "deleted" }.deleted)
+    }
+
+    @Test
     fun removeTagFromNotesDeletesTagWithoutDeletingNotes() {
         val notes = listOf(
             SNote(id = "one", tags = listOf("work", "launch")),

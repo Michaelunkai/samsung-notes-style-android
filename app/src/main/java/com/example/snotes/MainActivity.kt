@@ -491,6 +491,13 @@ fun renameFolderPath(folder: String, from: String, to: String): String {
     }
 }
 
+fun List<SNote>.removeFolderFromNotes(folder: String): List<SNote> {
+    val target = normalizeFolder(folder)
+    return map { note ->
+        if (note.folder == target || note.folder.startsWith("$target/")) note.copy(folder = "All notes") else note
+    }
+}
+
 fun renameTagList(tags: List<String>, from: String, to: String): List<String> {
     val source = from.trim().removePrefix("#")
     val target = parseTagInput(to).firstOrNull() ?: return tags
@@ -1107,6 +1114,24 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
                 notes = state.notes.map { note -> note.copy(folder = renameFolderPath(note.folder, from, target)) },
                 folderFilter = state.folderFilter?.let { renameFolderPath(it, from, target) },
                 statusMessage = "Folder renamed"
+            )
+        }
+        persist()
+    }
+
+    fun deleteFolder(folder: String) {
+        val target = normalizeFolder(folder)
+        if (target == "All notes") {
+            _state.update { it.copy(statusMessage = "Choose a folder to delete") }
+            return
+        }
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.removeFolderFromNotes(target),
+                surface = NotesSurface.All,
+                folderFilter = null,
+                selectedNoteIds = emptySet(),
+                statusMessage = "Folder $target removed; notes moved to All notes"
             )
         }
         persist()
@@ -2248,10 +2273,16 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
             )
         }
         if (state.surface == NotesSurface.Folders && state.folderFilter != null) {
+            val selectedFolder = state.folderFilter
             AssistChip(
-                onClick = { folderRenameTarget = state.folderFilter },
+                onClick = { folderRenameTarget = selectedFolder },
                 label = { Text("Rename folder") },
                 leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+            AssistChip(
+                onClick = { viewModel.deleteFolder(selectedFolder) },
+                label = { Text("Delete folder") },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp)) }
             )
         }
         state.tagSummaries.forEach { summary ->
