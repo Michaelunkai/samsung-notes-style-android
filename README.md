@@ -23,7 +23,7 @@ Current local build version: `0.2.0`.
 - Local Notes PIN support for locked notes, with locked previews hidden from search and widgets.
 - JSON backup export/import plus per-note plain text export/share and PDF export.
 - Android share targets for incoming text, images, PDFs, generic files, and audio.
-- Home-screen widget provider with latest-note preview, latest-note open target, and quick text/checklist/handwriting actions.
+- Home-screen widget provider with latest-note preview, latest-note open target, and quick text/checklist/sticky/handwriting actions.
 - Static launcher shortcuts for quick text, checklist, sticky, and handwriting notes.
 
 ## Important implementation notes

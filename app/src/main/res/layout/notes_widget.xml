@@ -65,6 +65,19 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/widget_quick_sticky_note"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginHorizontal="4dp"
+            android:layout_weight="1"
+            android:background="#F6E58D"
+            android:gravity="center"
+            android:text="@string/widget_quick_sticky"
+            android:textColor="#2B2A27"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
             android:id="@+id/widget_quick_drawing_note"
             android:layout_width="0dp"
             android:layout_height="match_parent"

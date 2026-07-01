@@ -11,6 +11,9 @@ import kotlinx.coroutines.runBlocking
 
 data class NotesWidgetSummary(val title: String, val subtitle: String, val noteId: String? = null)
 
+fun widgetQuickNoteKinds(): List<NewNoteKind> =
+    listOf(NewNoteKind.Text, NewNoteKind.Checklist, NewNoteKind.Sticky, NewNoteKind.Drawing)
+
 fun notesWidgetSummary(notes: List<SNote>): NotesWidgetSummary {
     val visible = notes.filterNot { it.deleted }.sortedWith(NoteSortMode.ModifiedNewest.comparator)
     val latest = visible.firstOrNull()
@@ -61,8 +64,12 @@ class NotesWidgetProvider : AppWidgetProvider() {
                     quickNotePendingIntent(context, appWidgetId + 20_000, NewNoteKind.Checklist)
                 )
                 setOnClickPendingIntent(
+                    R.id.widget_quick_sticky_note,
+                    quickNotePendingIntent(context, appWidgetId + 30_000, NewNoteKind.Sticky)
+                )
+                setOnClickPendingIntent(
                     R.id.widget_quick_drawing_note,
-                    quickNotePendingIntent(context, appWidgetId + 30_000, NewNoteKind.Drawing)
+                    quickNotePendingIntent(context, appWidgetId + 40_000, NewNoteKind.Drawing)
                 )
             }
             appWidgetManager.updateAppWidget(appWidgetId, views)

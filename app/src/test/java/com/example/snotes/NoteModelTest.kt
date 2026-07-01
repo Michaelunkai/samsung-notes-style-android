@@ -638,6 +638,14 @@ class NoteModelTest {
     }
 
     @Test
+    fun widgetQuickActionsExposePrimaryNoteKinds() {
+        assertEquals(
+            listOf(NewNoteKind.Text, NewNoteKind.Checklist, NewNoteKind.Sticky, NewNoteKind.Drawing),
+            widgetQuickNoteKinds()
+        )
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",
