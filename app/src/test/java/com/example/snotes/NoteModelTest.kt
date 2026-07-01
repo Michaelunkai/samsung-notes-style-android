@@ -112,6 +112,23 @@ class NoteModelTest {
     }
 
     @Test
+    fun newNoteKindsUseConfiguredDefaults() {
+        val defaults = NoteDefaults(pageTemplate = PageTemplate.Dotted, paperColor = 0xFFEFF6FF)
+
+        val text = NewNoteKind.Text.createNoteWithDefaults(defaults)
+        val checklist = NewNoteKind.Checklist.createNoteWithDefaults(defaults)
+        val drawing = NewNoteKind.Drawing.createNoteWithDefaults(defaults)
+
+        assertEquals(PageTemplate.Dotted, text.pageTemplate)
+        assertEquals(0xFFEFF6FF, text.paperColor)
+        assertTrue(text.blocks.single() is NoteBlock.Text)
+        assertTrue(checklist.blocks.single() is NoteBlock.Checklist)
+        assertTrue(drawing.blocks.single() is NoteBlock.Drawing)
+        assertEquals(PageTemplate.Dotted, checklist.pageTemplate)
+        assertEquals(0xFFEFF6FF, drawing.paperColor)
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",

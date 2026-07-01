@@ -73,9 +73,11 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -258,6 +260,19 @@ enum class PageTemplate(val label: String) {
     Dotted("Dotted")
 }
 
+val DEFAULT_PAPER_COLORS = listOf(
+    0xFFFFFBF0L,
+    0xFFFFFFFFL,
+    0xFFFFF8D6L,
+    0xFFEFF6FFL,
+    0xFFF5F5F4L
+)
+
+data class NoteDefaults(
+    val pageTemplate: PageTemplate = PageTemplate.Plain,
+    val paperColor: Long = DEFAULT_PAPER_COLORS.first()
+)
+
 data class NotesUiState(
     val notes: List<SNote> = emptyList(),
     val selectedNoteId: String? = null,
@@ -270,7 +285,8 @@ data class NotesUiState(
     val viewMode: NoteViewMode = NoteViewMode.List,
     val searchScope: SearchScope = SearchScope.All,
     val statusMessage: String? = null,
-    val darkMode: Boolean = false
+    val darkMode: Boolean = false,
+    val noteDefaults: NoteDefaults = NoteDefaults()
 ) {
     val visibleNotes: List<SNote>
         get() = notes
@@ -360,12 +376,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<NotesUiState> = _state
 
     fun createNote(kind: NewNoteKind) {
-        val blocks = when (kind) {
-            NewNoteKind.Text -> listOf(NoteBlock.Text())
-            NewNoteKind.Checklist -> listOf(NoteBlock.Checklist())
-            NewNoteKind.Drawing -> listOf(NoteBlock.Drawing())
-        }
-        val note = SNote(title = kind.title, blocks = blocks)
+        val note = kind.createNoteWithDefaults(_state.value.noteDefaults)
         _state.update { it.copy(notes = listOf(note) + it.notes, selectedNoteId = note.id) }
         persist()
     }
@@ -375,6 +386,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             title = text.lineSequence().firstOrNull()?.take(48)?.ifBlank { "Shared note" } ?: "Shared note",
             folder = "Shared",
             tags = listOf("shared"),
+            pageTemplate = _state.value.noteDefaults.pageTemplate,
+            paperColor = _state.value.noteDefaults.paperColor,
             blocks = listOf(NoteBlock.Text(text = text))
         )
         _state.update { it.copy(notes = listOf(note) + it.notes, selectedNoteId = note.id) }
@@ -435,6 +448,14 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleTheme() {
         _state.update { it.copy(darkMode = !it.darkMode) }
+    }
+
+    fun setDefaultPageTemplate(pageTemplate: PageTemplate) {
+        _state.update { it.copy(noteDefaults = it.noteDefaults.copy(pageTemplate = pageTemplate)) }
+    }
+
+    fun setDefaultPaperColor(paperColor: Long) {
+        _state.update { it.copy(noteDefaults = it.noteDefaults.copy(paperColor = paperColor)) }
     }
 
     fun updateNote(note: SNote) {
@@ -637,6 +658,20 @@ enum class NewNoteKind(val title: String) {
     Drawing("New sketch")
 }
 
+fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()): SNote {
+    val blocks = when (this) {
+        NewNoteKind.Text -> listOf(NoteBlock.Text())
+        NewNoteKind.Checklist -> listOf(NoteBlock.Checklist())
+        NewNoteKind.Drawing -> listOf(NoteBlock.Drawing())
+    }
+    return SNote(
+        title = title,
+        blocks = blocks,
+        pageTemplate = defaults.pageTemplate,
+        paperColor = defaults.paperColor
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesApp(viewModel: NotesViewModel, initialSharedText: String? = null) {
@@ -678,6 +713,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
     val context = LocalContext.current
     var createMenuOpen by remember { mutableStateOf(false) }
     var sortMenuOpen by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
     var pendingBackupText by remember { mutableStateOf("") }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -739,6 +775,14 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                     }
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("Settings") },
+                                leadingIcon = { Icon(Icons.Default.Settings, null) },
+                                onClick = {
+                                    sortMenuOpen = false
+                                    settingsOpen = true
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Export backup") },
                                 leadingIcon = { Icon(Icons.Default.AttachFile, null) },
@@ -834,6 +878,13 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
             }
         }
     ) { padding ->
+        if (settingsOpen) {
+            SettingsDialog(
+                state = state,
+                viewModel = viewModel,
+                onDismiss = { settingsOpen = false }
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1311,6 +1362,78 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
+fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Theme", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            if (state.darkMode) "Dark mode" else "Light mode",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    OutlinedButton(onClick = viewModel::toggleTheme) {
+                        Icon(
+                            if (state.darkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = null
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (state.darkMode) "Light" else "Dark")
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Default page", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        PageTemplate.entries.forEach { template ->
+                            FilterChip(
+                                selected = state.noteDefaults.pageTemplate == template,
+                                onClick = { viewModel.setDefaultPageTemplate(template) },
+                                label = { Text(template.label) }
+                            )
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Default paper", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        DEFAULT_PAPER_COLORS.forEach { color ->
+                            Box(
+                                Modifier
+                                    .size(32.dp)
+                                    .background(Color(color), CircleShape)
+                                    .border(
+                                        width = if (state.noteDefaults.paperColor == color) 3.dp else 1.dp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        shape = CircleShape
+                                    )
+                                    .clickable { viewModel.setDefaultPaperColor(color) }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 fun NoteMetaEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1351,13 +1474,7 @@ fun NoteMetaEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) 
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf(
-                    0xFFFFFBF0L,
-                    0xFFFFFFFFL,
-                    0xFFFFF8D6L,
-                    0xFFEFF6FFL,
-                    0xFFF5F5F4L
-                ).forEach { color ->
+                DEFAULT_PAPER_COLORS.forEach { color ->
                     Box(
                         Modifier
                             .size(30.dp)
