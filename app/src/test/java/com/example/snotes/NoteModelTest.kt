@@ -261,4 +261,26 @@ class NoteModelTest {
         assertEquals(1, onlyDone.clearCompleted().items.size)
         assertEquals("", onlyDone.clearCompleted().items.single().text)
     }
+
+    @Test
+    fun selectionStateAndBatchHelpersMutateOnlySelectedNotes() {
+        val notes = listOf(
+            SNote(id = "one", title = "One"),
+            SNote(id = "two", title = "Two"),
+            SNote(id = "three", title = "Three")
+        )
+        val selected = setOf("one", "three")
+        val state = NotesUiState(notes = notes, selectedNoteIds = selected)
+
+        assertTrue(state.isSelectionMode)
+        assertEquals(listOf("One", "Three"), state.selectedNotes.map { it.title })
+
+        val favorited = notes.updateByIds(selected) { it.copy(favorite = true) }
+        assertTrue(favorited.first { it.id == "one" }.favorite)
+        assertFalse(favorited.first { it.id == "two" }.favorite)
+        assertTrue(favorited.first { it.id == "three" }.favorite)
+
+        val remaining = notes.deleteByIds(setOf("two"))
+        assertEquals(listOf("one", "three"), remaining.map { it.id })
+    }
 }

@@ -259,6 +259,7 @@ enum class PageTemplate(val label: String) {
 data class NotesUiState(
     val notes: List<SNote> = emptyList(),
     val selectedNoteId: String? = null,
+    val selectedNoteIds: Set<String> = emptySet(),
     val search: String = "",
     val folderFilter: String? = null,
     val tagFilter: String? = null,
@@ -290,6 +291,12 @@ data class NotesUiState(
 
     val selectedNote: SNote?
         get() = notes.firstOrNull { it.id == selectedNoteId }
+
+    val selectedNotes: List<SNote>
+        get() = notes.filter { it.id in selectedNoteIds }
+
+    val isSelectionMode: Boolean
+        get() = selectedNoteIds.isNotEmpty()
 
     val folders: List<String>
         get() = notes.filter { !it.deleted }.map { it.folder }.distinct().sorted()
@@ -370,6 +377,17 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectNote(id: String?) {
         _state.update { it.copy(selectedNoteId = id) }
+    }
+
+    fun toggleNoteSelection(id: String) {
+        _state.update { state ->
+            val selected = if (id in state.selectedNoteIds) state.selectedNoteIds - id else state.selectedNoteIds + id
+            state.copy(selectedNoteIds = selected, selectedNoteId = null)
+        }
+    }
+
+    fun clearSelection() {
+        _state.update { it.copy(selectedNoteIds = emptySet()) }
     }
 
     fun setSearch(search: String) {
@@ -470,6 +488,45 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             state.copy(
                 notes = state.notes.filterNot { it.id == note.id },
                 selectedNoteId = state.selectedNoteId.takeUnless { it == note.id }
+            )
+        }
+        persist()
+    }
+
+    fun batchFavoriteSelected(favorite: Boolean) {
+        updateSelectedNotes { it.copy(favorite = favorite) }
+    }
+
+    fun batchLockSelected(locked: Boolean) {
+        updateSelectedNotes { it.copy(locked = locked) }
+    }
+
+    fun batchMoveSelectedToTrash() {
+        updateSelectedNotes { it.copy(deleted = true) }
+    }
+
+    fun batchRestoreSelected() {
+        updateSelectedNotes { it.copy(deleted = false) }
+    }
+
+    fun batchDeleteSelectedPermanently() {
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.deleteByIds(state.selectedNoteIds),
+                selectedNoteIds = emptySet(),
+                selectedNoteId = state.selectedNoteId.takeUnless { it in state.selectedNoteIds },
+                statusMessage = "Deleted selected notes"
+            )
+        }
+        persist()
+    }
+
+    private fun updateSelectedNotes(transform: (SNote) -> SNote) {
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.updateByIds(state.selectedNoteIds, transform),
+                selectedNoteIds = emptySet(),
+                statusMessage = "Updated selected notes"
             )
         }
         persist()
@@ -793,11 +850,19 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
             FilterRail(state, viewModel)
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "${state.visibleNotes.size} notes • ${state.sortMode.label} • ${state.viewMode.label}",
+                text = if (state.isSelectionMode) {
+                    "${state.selectedNoteIds.size} selected"
+                } else {
+                    "${state.visibleNotes.size} notes • ${state.sortMode.label} • ${state.viewMode.label}"
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
+            if (state.isSelectionMode) {
+                SelectionActionBar(state, viewModel)
+                Spacer(Modifier.height(8.dp))
+            }
             if (state.viewMode == NoteViewMode.Grid) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 170.dp),
@@ -809,13 +874,19 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                         NoteCard(
                             note = note,
                             inTrash = state.surface == NotesSurface.Trash,
+                            selected = note.id in state.selectedNoteIds,
                             onClick = {
-                                when {
-                                    note.deleted -> Unit
-                                    note.locked -> viewModel.setStatus("Unlock note to edit")
-                                    else -> viewModel.selectNote(note.id)
+                                if (state.isSelectionMode) {
+                                    viewModel.toggleNoteSelection(note.id)
+                                } else {
+                                    when {
+                                        note.deleted -> Unit
+                                        note.locked -> viewModel.setStatus("Unlock note to edit")
+                                        else -> viewModel.selectNote(note.id)
+                                    }
                                 }
                             },
+                            onLongClick = { viewModel.toggleNoteSelection(note.id) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onToggleLock = { viewModel.toggleLocked(note) },
                             onMoveToTrash = { viewModel.deleteNote(note) },
@@ -833,13 +904,19 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                         NoteCard(
                             note = note,
                             inTrash = state.surface == NotesSurface.Trash,
+                            selected = note.id in state.selectedNoteIds,
                             onClick = {
-                                when {
-                                    note.deleted -> Unit
-                                    note.locked -> viewModel.setStatus("Unlock note to edit")
-                                    else -> viewModel.selectNote(note.id)
+                                if (state.isSelectionMode) {
+                                    viewModel.toggleNoteSelection(note.id)
+                                } else {
+                                    when {
+                                        note.deleted -> Unit
+                                        note.locked -> viewModel.setStatus("Unlock note to edit")
+                                        else -> viewModel.selectNote(note.id)
+                                    }
                                 }
                             },
+                            onLongClick = { viewModel.toggleNoteSelection(note.id) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onToggleLock = { viewModel.toggleLocked(note) },
                             onMoveToTrash = { viewModel.deleteNote(note) },
@@ -849,6 +926,34 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (state.surface == NotesSurface.Trash) {
+            Button(onClick = viewModel::batchRestoreSelected) {
+                Text("Restore")
+            }
+            Button(onClick = viewModel::batchDeleteSelectedPermanently) {
+                Text("Delete")
+            }
+        } else {
+            Button(onClick = { viewModel.batchFavoriteSelected(true) }) {
+                Text("Favorite")
+            }
+            Button(onClick = { viewModel.batchLockSelected(true) }) {
+                Text("Lock")
+            }
+            Button(onClick = viewModel::batchMoveSelectedToTrash) {
+                Text("Trash")
+            }
+        }
+        OutlinedButton(onClick = viewModel::clearSelection) {
+            Text("Cancel")
         }
     }
 }
@@ -907,7 +1012,9 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
 fun NoteCard(
     note: SNote,
     inTrash: Boolean,
+    selected: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleLock: () -> Unit,
     onMoveToTrash: () -> Unit,
@@ -918,12 +1025,18 @@ fun NoteCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
+        ),
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (selected) {
+                    Icon(Icons.Default.CheckBox, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text(
                     text = note.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -939,6 +1052,14 @@ fun NoteCard(
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         if (inTrash) {
+                            DropdownMenuItem(
+                                text = { Text("Select") },
+                                leadingIcon = { Icon(Icons.Default.CheckBox, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onLongClick()
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Restore") },
                                 leadingIcon = { Icon(Icons.Default.Description, null) },
@@ -956,6 +1077,14 @@ fun NoteCard(
                                 }
                             )
                         } else {
+                            DropdownMenuItem(
+                                text = { Text("Select") },
+                                leadingIcon = { Icon(Icons.Default.CheckBox, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onLongClick()
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text(if (note.favorite) "Remove favorite" else "Add favorite") },
                                 leadingIcon = { Icon(Icons.Default.Favorite, null) },
@@ -1798,6 +1927,12 @@ fun formatDuration(durationMs: Long): String {
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
 }
+
+fun List<SNote>.updateByIds(ids: Set<String>, transform: (SNote) -> SNote): List<SNote> =
+    map { note -> if (note.id in ids) transform(note) else note }
+
+fun List<SNote>.deleteByIds(ids: Set<String>): List<SNote> =
+    filterNot { it.id in ids }
 
 fun NoteBlock.Checklist.progress(): ChecklistProgress =
     ChecklistProgress(done = items.count { it.checked }, total = items.size)
