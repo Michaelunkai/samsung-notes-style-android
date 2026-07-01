@@ -768,6 +768,15 @@ class NoteModelTest {
         val createdState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedNewest)
         assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), createdState.visibleNotes.map { it.title })
 
+        val modifiedOldestState = NotesUiState(notes = notes, sortMode = NoteSortMode.ModifiedOldest)
+        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha"), modifiedOldestState.visibleNotes.map { it.title })
+
+        val createdOldestState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedOldest)
+        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha"), createdOldestState.visibleNotes.map { it.title })
+
+        val titleDescendingState = NotesUiState(notes = notes, sortMode = NoteSortMode.TitleDescending)
+        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha"), titleDescendingState.visibleNotes.map { it.title })
+
         val folderState = NotesUiState(notes = notes, sortMode = NoteSortMode.FolderAscending)
         assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), folderState.visibleNotes.map { it.title })
     }

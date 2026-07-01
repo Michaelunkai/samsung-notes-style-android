@@ -570,16 +570,28 @@ enum class SearchScope(val label: String) {
 
 enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
     ModifiedNewest(
-        "Date modified",
+        "Modified newest",
         compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenByDescending { it.updatedAt }
     ),
+    ModifiedOldest(
+        "Modified oldest",
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.updatedAt }
+    ),
     CreatedNewest(
-        "Date created",
+        "Created newest",
         compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenByDescending { it.createdAt }
     ),
+    CreatedOldest(
+        "Created oldest",
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.createdAt }
+    ),
     TitleAscending(
-        "Title",
+        "Title A-Z",
         compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.title.lowercase() }
+    ),
+    TitleDescending(
+        "Title Z-A",
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenByDescending { it.title.lowercase() }
     ),
     FolderAscending(
         "Folder",
