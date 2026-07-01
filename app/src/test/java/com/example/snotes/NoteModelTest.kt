@@ -17,7 +17,14 @@ class NoteModelTest {
             pageTemplate = PageTemplate.Grid,
             paperColor = 0xFFEFF6FF,
             blocks = listOf(
-                NoteBlock.Text(text = "Discuss release", bold = true, italic = true, underline = true, color = 0xFF1D4ED8),
+                NoteBlock.Text(
+                    text = "Discuss release",
+                    bold = true,
+                    italic = true,
+                    underline = true,
+                    color = 0xFF1D4ED8,
+                    alignment = TextAlignment.Center
+                ),
                 NoteBlock.Checklist(
                     items = listOf(
                         CheckItem(text = "Ship debug build", checked = true),
@@ -53,6 +60,7 @@ class NoteModelTest {
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
         assertTrue((restored.blocks[0] as NoteBlock.Text).bold)
         assertTrue((restored.blocks[0] as NoteBlock.Text).underline)
+        assertEquals(TextAlignment.Center, (restored.blocks[0] as NoteBlock.Text).alignment)
         assertEquals("Ship debug build", (restored.blocks[1] as NoteBlock.Checklist).items[0].text)
         assertTrue((restored.blocks[1] as NoteBlock.Checklist).items[0].checked)
         assertEquals(2, (restored.blocks[2] as NoteBlock.Drawing).strokes.first().points.size)
@@ -303,6 +311,12 @@ class NoteModelTest {
         assertEquals("Work-Plan-Q3-", "Work/Plan:Q3?".sanitizeFileName())
         assertEquals("Untitled note", "   ".sanitizeFileName())
         assertEquals(80, "a".repeat(120).sanitizeFileName().length)
+    }
+
+    @Test
+    fun textAlignmentParserFallsBackForLegacyBlocks() {
+        assertEquals(TextAlignment.End, "End".toTextAlignment(TextAlignment.Start))
+        assertEquals(TextAlignment.Start, "legacy".toTextAlignment(TextAlignment.Start))
     }
 
     @Test

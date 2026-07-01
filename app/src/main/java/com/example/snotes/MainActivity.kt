@@ -63,6 +63,9 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FormatAlignCenter
+import androidx.compose.material.icons.filled.FormatAlignLeft
+import androidx.compose.material.icons.filled.FormatAlignRight
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.FormatItalic
@@ -136,6 +139,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -237,7 +241,8 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         val underline: Boolean = false,
         val color: Long = 0xFF2B2A27,
         val highlight: Long = 0x00FFFFFF,
-        val sizeSp: Int = 18
+        val sizeSp: Int = 18,
+        val alignment: TextAlignment = TextAlignment.Start
     ) : NoteBlock(id, "Text")
 
     data class Checklist(
@@ -297,6 +302,18 @@ enum class DrawTool(val label: String) {
     Fountain("Fountain"),
     Highlighter("Highlighter"),
     Eraser("Eraser")
+}
+
+enum class TextAlignment(val label: String) {
+    Start("Left"),
+    Center("Center"),
+    End("Right")
+}
+
+fun TextAlignment.toComposeTextAlign(): TextAlign = when (this) {
+    TextAlignment.Start -> TextAlign.Start
+    TextAlignment.Center -> TextAlign.Center
+    TextAlignment.End -> TextAlign.End
 }
 
 enum class PageTemplate(val label: String) {
@@ -2173,7 +2190,8 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
         fontSize = block.sizeSp.sp,
         fontWeight = if (block.bold) FontWeight.Bold else FontWeight.Normal,
         fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal,
-        textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None
+        textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None,
+        textAlign = block.alignment.toComposeTextAlign()
     )
 
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -2259,6 +2277,27 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                         selected = block.sizeSp == size,
                         onClick = { viewModel.updateBlock(note, block.copy(sizeSp = size)) },
                         label = { Text("${size}sp") }
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Align", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextAlignment.entries.forEach { alignment ->
+                    FilterChip(
+                        selected = block.alignment == alignment,
+                        onClick = { viewModel.updateBlock(note, block.copy(alignment = alignment)) },
+                        label = { Text(alignment.label) },
+                        leadingIcon = {
+                            Icon(
+                                when (alignment) {
+                                    TextAlignment.Start -> Icons.Default.FormatAlignLeft
+                                    TextAlignment.Center -> Icons.Default.FormatAlignCenter
+                                    TextAlignment.End -> Icons.Default.FormatAlignRight
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     )
                 }
             }
@@ -2924,6 +2963,7 @@ fun NoteBlock.toJson(): JSONObject {
             .put("color", color)
             .put("highlight", highlight)
             .put("sizeSp", sizeSp)
+            .put("alignment", alignment.name)
 
         is NoteBlock.Checklist -> json
             .put("type", "checklist")
@@ -3040,7 +3080,8 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         underline = optBoolean("underline", false),
         color = optLong("color", 0xFF2B2A27),
         highlight = optLong("highlight", 0x00FFFFFF),
-        sizeSp = optInt("sizeSp", 18)
+        sizeSp = optInt("sizeSp", 18),
+        alignment = optString("alignment").toTextAlignment(TextAlignment.Start)
     )
 }
 
@@ -3080,6 +3121,9 @@ fun JSONArray?.toStrokes(): List<DrawStroke> {
 
 fun String.toDrawTool(default: DrawTool): DrawTool =
     DrawTool.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
+
+fun String.toTextAlignment(default: TextAlignment): TextAlignment =
+    TextAlignment.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
 
 fun String.toPageTemplate(default: PageTemplate): PageTemplate =
     PageTemplate.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
