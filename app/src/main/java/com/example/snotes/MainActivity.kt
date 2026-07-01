@@ -1298,6 +1298,16 @@ fun SNote.details(): NoteDetails = NoteDetails(
 fun SNote.cardMetaLabel(): String =
     "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • $folder"
 
+fun SNote.checklistProgressLabel(): String? {
+    val total = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size }
+    if (total == 0) return null
+    val done = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { checklist ->
+        checklist.items.count { it.checked }
+    }
+    val itemLabel = if (total == 1) "task" else "tasks"
+    return "$done/$total $itemLabel done"
+}
+
 fun formatTimestamp(timestamp: Long): String =
     SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(timestamp))
 
@@ -2234,6 +2244,18 @@ fun NoteCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall
             )
+            if (!note.locked) {
+                note.checklistProgressLabel()?.let { progress ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        progress,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
             if (search.isNotBlank() && matches.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 Text(

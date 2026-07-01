@@ -2,6 +2,7 @@ package com.example.snotes
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -601,6 +602,25 @@ class NoteModelTest {
         assertTrue(label.contains("2024") || label.contains("24"))
         assertTrue(label.contains("2 blocks"))
         assertTrue(label.endsWith("Work"))
+    }
+
+    @Test
+    fun checklistProgressLabelSummarizesVisibleTasks() {
+        val note = SNote(
+            blocks = listOf(
+                NoteBlock.Text(text = "Body"),
+                NoteBlock.Checklist(
+                    items = listOf(
+                        CheckItem(text = "Done", checked = true),
+                        CheckItem(text = "Later", checked = false)
+                    )
+                ),
+                NoteBlock.Checklist(items = listOf(CheckItem(text = "Also done", checked = true)))
+            )
+        )
+
+        assertEquals("2/3 tasks done", note.checklistProgressLabel())
+        assertNull(SNote(blocks = listOf(NoteBlock.Text(text = "No tasks"))).checklistProgressLabel())
     }
 
     @Test
