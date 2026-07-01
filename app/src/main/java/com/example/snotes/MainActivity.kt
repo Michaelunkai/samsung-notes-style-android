@@ -668,6 +668,21 @@ enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
     FolderAscending(
         "Folder",
         compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.folder.lowercase() }.thenBy { it.title.lowercase() }
+    ),
+    ChecklistProgress(
+        "Checklist progress",
+        compareByDescending<SNote> { it.pinned }
+            .thenByDescending { it.favorite }
+            .thenByDescending { it.checklistTotalCount() }
+            .thenByDescending { it.checklistDoneCount() }
+            .thenByDescending { it.updatedAt }
+    ),
+    MediaHeavy(
+        "Media first",
+        compareByDescending<SNote> { it.pinned }
+            .thenByDescending { it.favorite }
+            .thenByDescending { it.mediaBlockCount() }
+            .thenByDescending { it.updatedAt }
     )
 }
 
@@ -1419,12 +1434,21 @@ fun SNote.details(): NoteDetails = NoteDetails(
 fun SNote.cardMetaLabel(): String =
     "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • $folder"
 
-fun SNote.checklistProgressLabel(): String? {
-    val total = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size }
-    if (total == 0) return null
-    val done = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { checklist ->
+fun SNote.checklistTotalCount(): Int =
+    blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size }
+
+fun SNote.checklistDoneCount(): Int =
+    blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { checklist ->
         checklist.items.count { it.checked }
     }
+
+fun SNote.mediaBlockCount(): Int =
+    blocks.count { it is NoteBlock.Attachment || it is NoteBlock.Audio }
+
+fun SNote.checklistProgressLabel(): String? {
+    val total = checklistTotalCount()
+    if (total == 0) return null
+    val done = checklistDoneCount()
     val itemLabel = if (total == 1) "task" else "tasks"
     return "$done/$total $itemLabel done"
 }

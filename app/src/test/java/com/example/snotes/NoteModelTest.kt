@@ -927,26 +927,57 @@ class NoteModelTest {
             SNote(title = "Beta", folder = "B", createdAt = 1, updatedAt = 1),
             SNote(title = "Alpha", folder = "A", createdAt = 3, updatedAt = 3),
             SNote(title = "Favorite", folder = "Z", favorite = true, createdAt = 2, updatedAt = 2),
-            SNote(title = "Pinned", folder = "Z", pinned = true, createdAt = 1, updatedAt = 1)
+            SNote(title = "Pinned", folder = "Z", pinned = true, createdAt = 1, updatedAt = 1),
+            SNote(
+                title = "Tasks",
+                folder = "C",
+                createdAt = 4,
+                updatedAt = 4,
+                blocks = listOf(
+                    NoteBlock.Checklist(
+                        items = listOf(
+                            CheckItem(text = "One", checked = true),
+                            CheckItem(text = "Two", checked = true),
+                            CheckItem(text = "Three")
+                        )
+                    )
+                )
+            ),
+            SNote(
+                title = "Media",
+                folder = "D",
+                createdAt = 5,
+                updatedAt = 5,
+                blocks = listOf(
+                    NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf"),
+                    NoteBlock.Audio(path = "/audio/one.m4a", name = "one.m4a")
+                )
+            )
         )
 
         val titleState = NotesUiState(notes = notes, sortMode = NoteSortMode.TitleAscending)
-        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), titleState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta", "Media", "Tasks"), titleState.visibleNotes.map { it.title })
 
         val createdState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedNewest)
-        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), createdState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Media", "Tasks", "Alpha", "Beta"), createdState.visibleNotes.map { it.title })
 
         val modifiedOldestState = NotesUiState(notes = notes, sortMode = NoteSortMode.ModifiedOldest)
-        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha"), modifiedOldestState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha", "Tasks", "Media"), modifiedOldestState.visibleNotes.map { it.title })
 
         val createdOldestState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedOldest)
-        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha"), createdOldestState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha", "Tasks", "Media"), createdOldestState.visibleNotes.map { it.title })
 
         val titleDescendingState = NotesUiState(notes = notes, sortMode = NoteSortMode.TitleDescending)
-        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha"), titleDescendingState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Tasks", "Media", "Beta", "Alpha"), titleDescendingState.visibleNotes.map { it.title })
 
         val folderState = NotesUiState(notes = notes, sortMode = NoteSortMode.FolderAscending)
-        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), folderState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta", "Tasks", "Media"), folderState.visibleNotes.map { it.title })
+
+        val checklistState = NotesUiState(notes = notes, sortMode = NoteSortMode.ChecklistProgress)
+        assertEquals(listOf("Pinned", "Favorite", "Tasks", "Media", "Alpha", "Beta"), checklistState.visibleNotes.map { it.title })
+
+        val mediaState = NotesUiState(notes = notes, sortMode = NoteSortMode.MediaHeavy)
+        assertEquals(listOf("Pinned", "Favorite", "Media", "Tasks", "Alpha", "Beta"), mediaState.visibleNotes.map { it.title })
     }
 
     @Test
