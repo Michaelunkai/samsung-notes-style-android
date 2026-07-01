@@ -62,6 +62,8 @@ import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
@@ -255,7 +257,7 @@ data class NotesUiState(
             .filter { note ->
                 search.isBlank() ||
                     note.title.contains(search, ignoreCase = true) ||
-                    note.preview.contains(search, ignoreCase = true) ||
+                    (!note.locked && note.preview.contains(search, ignoreCase = true)) ||
                     note.tags.any { it.contains(search, ignoreCase = true) } ||
                     note.folder.contains(search, ignoreCase = true)
             }
@@ -414,6 +416,17 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         updateNote(note.copy(favorite = !note.favorite))
     }
 
+    fun toggleLocked(note: SNote) {
+        val locked = !note.locked
+        updateNote(note.copy(locked = locked))
+        _state.update {
+            it.copy(
+                selectedNoteId = it.selectedNoteId.takeUnless { selectedId -> selectedId == note.id && locked },
+                statusMessage = if (locked) "Note locked" else "Note unlocked"
+            )
+        }
+    }
+
     fun deleteNote(note: SNote) {
         updateNote(note.copy(deleted = true))
         _state.update { it.copy(selectedNoteId = null) }
@@ -554,7 +567,7 @@ fun NotesApp(viewModel: NotesViewModel, initialSharedText: String? = null) {
     MaterialTheme(colorScheme = scheme) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             val selected = state.selectedNote
-            if (selected == null) {
+            if (selected == null || selected.locked) {
                 NotesHome(state, viewModel)
             } else {
                 NoteEditor(selected, state, viewModel)
@@ -767,8 +780,15 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                         NoteCard(
                             note = note,
                             inTrash = state.surface == NotesSurface.Trash,
-                            onClick = { if (!note.deleted) viewModel.selectNote(note.id) },
+                            onClick = {
+                                when {
+                                    note.deleted -> Unit
+                                    note.locked -> viewModel.setStatus("Unlock note to edit")
+                                    else -> viewModel.selectNote(note.id)
+                                }
+                            },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onToggleLock = { viewModel.toggleLocked(note) },
                             onMoveToTrash = { viewModel.deleteNote(note) },
                             onRestore = { viewModel.restoreNote(note) },
                             onPermanentDelete = { viewModel.permanentlyDeleteNote(note) }
@@ -784,8 +804,15 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                         NoteCard(
                             note = note,
                             inTrash = state.surface == NotesSurface.Trash,
-                            onClick = { if (!note.deleted) viewModel.selectNote(note.id) },
+                            onClick = {
+                                when {
+                                    note.deleted -> Unit
+                                    note.locked -> viewModel.setStatus("Unlock note to edit")
+                                    else -> viewModel.selectNote(note.id)
+                                }
+                            },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onToggleLock = { viewModel.toggleLocked(note) },
                             onMoveToTrash = { viewModel.deleteNote(note) },
                             onRestore = { viewModel.restoreNote(note) },
                             onPermanentDelete = { viewModel.permanentlyDeleteNote(note) }
@@ -853,6 +880,7 @@ fun NoteCard(
     inTrash: Boolean,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onToggleLock: () -> Unit,
     onMoveToTrash: () -> Unit,
     onRestore: () -> Unit,
     onPermanentDelete: () -> Unit
@@ -875,6 +903,7 @@ fun NoteCard(
                     modifier = Modifier.weight(1f)
                 )
                 if (note.favorite) Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color(0xFFE3A008))
+                if (note.locked) Icon(Icons.Default.Lock, contentDescription = "Locked", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "Note actions")
@@ -907,6 +936,14 @@ fun NoteCard(
                                 }
                             )
                             DropdownMenuItem(
+                                text = { Text(if (note.locked) "Unlock note" else "Lock note") },
+                                leadingIcon = { Icon(if (note.locked) Icons.Default.LockOpen else Icons.Default.Lock, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onToggleLock()
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Move to Trash") },
                                 leadingIcon = { Icon(Icons.Default.Delete, null) },
                                 onClick = {
@@ -919,7 +956,12 @@ fun NoteCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Text(note.preview, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                if (note.locked) "Locked note" else note.preview,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 AssistChip(onClick = {}, label = { Text(note.folder) }, leadingIcon = { Icon(Icons.Default.Folder, null) })
@@ -927,7 +969,11 @@ fun NoteCard(
                     AssistChip(onClick = {}, label = { Text("#$tag") })
                 }
                 Spacer(Modifier.weight(1f))
-                BlockBadges(note.blocks)
+                if (note.locked) {
+                    Icon(Icons.Default.Lock, contentDescription = "Locked note")
+                } else {
+                    BlockBadges(note.blocks)
+                }
             }
         }
     }
@@ -982,6 +1028,9 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                             if (note.favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Favorite"
                         )
+                    }
+                    IconButton(onClick = { viewModel.toggleLocked(note) }) {
+                        Icon(Icons.Default.Lock, contentDescription = "Lock note")
                     }
                     IconButton(onClick = { viewModel.deleteNote(note) }) {
                         Icon(Icons.Default.Delete, contentDescription = "Move to trash")

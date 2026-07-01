@@ -188,4 +188,20 @@ class NoteModelTest {
         assertEquals(2, legacy.size)
         assertEquals("Work", legacy.first { it.title == "Backup one" }.folder)
     }
+
+    @Test
+    fun lockedNotesHidePreviewContentFromSearch() {
+        val state = NotesUiState(
+            notes = listOf(
+                SNote(title = "Private", locked = true, blocks = listOf(NoteBlock.Text(text = "secret body"))),
+                SNote(title = "Public", blocks = listOf(NoteBlock.Text(text = "secret body")))
+            ),
+            search = "secret"
+        )
+
+        assertEquals(listOf("Public"), state.visibleNotes.map { it.title })
+
+        val titleState = state.copy(search = "Private")
+        assertEquals(listOf("Private"), titleState.visibleNotes.map { it.title })
+    }
 }
