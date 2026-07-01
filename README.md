@@ -2,6 +2,8 @@
 
 Native Android prototype for a Samsung Notes-style note-taking app.
 
+Current local build version: `0.2.0`.
+
 ## Implemented in this workspace
 
 - Kotlin Android project scaffold using Gradle Kotlin DSL and Jetpack Compose.
