@@ -334,6 +334,34 @@ class NoteModelTest {
     }
 
     @Test
+    fun noteDetailsSummarizeMixedContentCounts() {
+        val note = SNote(
+            blocks = listOf(
+                NoteBlock.Text(text = "alpha beta gamma"),
+                NoteBlock.Checklist(
+                    items = listOf(
+                        CheckItem(text = "Done", checked = true),
+                        CheckItem(text = "Later", checked = false)
+                    )
+                ),
+                NoteBlock.Drawing(strokes = listOf(DrawStroke(color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))),
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
+                NoteBlock.Audio(path = "/audio/review.m4a", name = "review.m4a")
+            )
+        )
+
+        val details = note.details()
+
+        assertEquals(5, details.blockCount)
+        assertEquals(3, details.wordCount)
+        assertEquals(2, details.checklistItems)
+        assertEquals(1, details.completedChecklistItems)
+        assertEquals(1, details.drawingStrokes)
+        assertEquals(1, details.attachments)
+        assertEquals(1, details.audioBlocks)
+    }
+
+    @Test
     fun noteExportFileNamesAreSanitized() {
         assertEquals("Work-Plan-Q3-", "Work/Plan:Q3?".sanitizeFileName())
         assertEquals("Untitled note", "   ".sanitizeFileName())

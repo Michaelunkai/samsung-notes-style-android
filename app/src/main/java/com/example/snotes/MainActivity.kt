@@ -76,6 +76,7 @@ import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LightMode
@@ -156,6 +157,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -291,6 +295,16 @@ data class ChecklistProgress(val done: Int, val total: Int) {
     val label: String
         get() = "$done/$total done"
 }
+
+data class NoteDetails(
+    val blockCount: Int,
+    val wordCount: Int,
+    val checklistItems: Int,
+    val completedChecklistItems: Int,
+    val drawingStrokes: Int,
+    val attachments: Int,
+    val audioBlocks: Int
+)
 
 data class SearchMatch(val scope: SearchScope, val label: String)
 
@@ -1012,6 +1026,23 @@ fun SNote.toPlainText(): String = buildString {
         append(block.toPlainText())
     }
 }.trim()
+
+fun SNote.details(): NoteDetails = NoteDetails(
+    blockCount = blocks.size,
+    wordCount = blocks.filterIsInstance<NoteBlock.Text>().sumOf { block ->
+        block.text.split(Regex("""\s+""")).count { it.isNotBlank() }
+    },
+    checklistItems = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size },
+    completedChecklistItems = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { checklist ->
+        checklist.items.count { it.checked }
+    },
+    drawingStrokes = blocks.filterIsInstance<NoteBlock.Drawing>().sumOf { it.strokes.size },
+    attachments = blocks.count { it is NoteBlock.Attachment },
+    audioBlocks = blocks.count { it is NoteBlock.Audio }
+)
+
+fun formatTimestamp(timestamp: Long): String =
+    SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(timestamp))
 
 fun SNote.toPdfLines(maxLineLength: Int = 88): List<String> =
     toPlainText()
@@ -1917,6 +1948,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var recordingStartedAt by remember { mutableStateOf(0L) }
     var pendingNoteExportText by remember { mutableStateOf("") }
     var pendingPdfExportNote by remember { mutableStateOf<SNote?>(null) }
+    var detailsOpen by remember { mutableStateOf(false) }
     DisposableEffect(audioRecorder) {
         onDispose {
             audioRecorder.stop()
@@ -1976,6 +2008,9 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { detailsOpen = true }) {
+                        Icon(Icons.Default.Info, contentDescription = "Note details")
+                    }
                     IconButton(onClick = { viewModel.togglePinned(note) }) {
                         Icon(
                             Icons.Default.PushPin,
@@ -2048,6 +2083,9 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             )
         }
     ) { padding ->
+        if (detailsOpen) {
+            NoteDetailsDialog(note = note, onDismiss = { detailsOpen = false })
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -2229,6 +2267,48 @@ fun UnlockNoteDialog(note: SNote, onUnlock: (String) -> Unit, onDismiss: () -> U
             }
         }
     )
+}
+
+@Composable
+fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
+    val details = note.details()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Note details") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DetailRow("Folder", note.folder)
+                DetailRow("Tags", note.tags.joinToString(", ").ifBlank { "None" })
+                DetailRow("Created", formatTimestamp(note.createdAt))
+                DetailRow("Modified", formatTimestamp(note.updatedAt))
+                DetailRow("Blocks", details.blockCount.toString())
+                DetailRow("Words", details.wordCount.toString())
+                DetailRow("Checklist", "${details.completedChecklistItems}/${details.checklistItems} done")
+                DetailRow("Ink strokes", details.drawingStrokes.toString())
+                DetailRow("Attachments", details.attachments.toString())
+                DetailRow("Audio", details.audioBlocks.toString())
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        }
+    )
+}
+
+@Composable
+fun DetailRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, modifier = Modifier.weight(0.4f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value,
+            modifier = Modifier.weight(0.6f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
