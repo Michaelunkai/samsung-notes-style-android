@@ -52,8 +52,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Brush
@@ -65,8 +68,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FormatAlignCenter
-import androidx.compose.material.icons.filled.FormatAlignLeft
-import androidx.compose.material.icons.filled.FormatAlignRight
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.FormatItalic
@@ -81,7 +82,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -98,7 +98,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -107,6 +106,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -1974,7 +1974,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                 title = { Text(note.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.selectNote(null) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
@@ -2430,9 +2430,9 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                         leadingIcon = {
                             Icon(
                                 when (alignment) {
-                                    TextAlignment.Start -> Icons.Default.FormatAlignLeft
+                                    TextAlignment.Start -> Icons.AutoMirrored.Filled.FormatAlignLeft
                                     TextAlignment.Center -> Icons.Default.FormatAlignCenter
-                                    TextAlignment.End -> Icons.Default.FormatAlignRight
+                                    TextAlignment.End -> Icons.AutoMirrored.Filled.FormatAlignRight
                                 },
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
@@ -2550,7 +2550,7 @@ fun ChecklistBlockEditor(note: SNote, block: NoteBlock.Checklist, viewModel: Not
                         Icon(Icons.Default.Delete, "Delete item", modifier = Modifier.size(18.dp))
                     }
                 }
-                Divider()
+                HorizontalDivider()
             }
         }
     }
@@ -2839,7 +2839,7 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
                         }
                     }
                 ) {
-                    Icon(Icons.Default.OpenInNew, "Open attachment")
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, "Open attachment")
                 }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete attachment")
