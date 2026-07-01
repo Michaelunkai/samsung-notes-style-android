@@ -113,6 +113,11 @@ class NoteModelTest {
         assertEquals("Trash is empty", NotesUiState(surface = NotesSurface.Trash).emptyNotesCopy().title)
         assertEquals("No favorites yet", NotesUiState(surface = NotesSurface.Favorites).emptyNotesCopy().title)
         assertEquals("No locked notes", NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().title)
+        assertNull(NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().actionLabel)
+        assertEquals(
+            "New note",
+            NotesUiState(surface = NotesSurface.Locked, notePinDigest = hashNotesPin("1234")).emptyNotesCopy().actionLabel
+        )
         assertEquals(
             "No notes in Work",
             NotesUiState(surface = NotesSurface.Folders, folderFilter = "Work").emptyNotesCopy().title

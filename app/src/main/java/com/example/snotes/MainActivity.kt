@@ -759,8 +759,12 @@ fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
     )
     surface == NotesSurface.Locked -> EmptyNotesCopy(
         title = "No locked notes",
-        subtitle = "Lock private notes to keep their previews out of search, widgets, and the note list.",
-        actionLabel = noteDefaults.newNoteKind.title
+        subtitle = if (hasNotePin) {
+            "Create a private note here or lock an existing note from its note actions."
+        } else {
+            "Set a Notes PIN in Settings before creating private notes."
+        },
+        actionLabel = if (hasNotePin) noteDefaults.newNoteKind.title else null
     )
     surface == NotesSurface.Folders && folderFilter != null -> EmptyNotesCopy(
         title = "No notes in $folderFilter",
