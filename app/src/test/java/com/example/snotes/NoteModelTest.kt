@@ -684,6 +684,22 @@ class NoteModelTest {
     }
 
     @Test
+    fun mediaCardLabelSummarizesFilesAndAudio() {
+        val mixed = SNote(
+            blocks = listOf(
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf"),
+                NoteBlock.Attachment(uri = "content://example/image", name = "photo.jpg"),
+                NoteBlock.Audio(path = "/audio/one.m4a", name = "one.m4a")
+            )
+        )
+        val audioOnly = SNote(blocks = listOf(NoteBlock.Audio(path = "/audio/one.m4a", name = "one.m4a")))
+
+        assertEquals("2 files • 1 audio", mixed.mediaCardLabel())
+        assertEquals("1 audio", audioOnly.mediaCardLabel())
+        assertNull(SNote(blocks = listOf(NoteBlock.Text(text = "No media"))).mediaCardLabel())
+    }
+
+    @Test
     fun noteExportFileNamesAreSanitized() {
         assertEquals("Work-Plan-Q3-", "Work/Plan:Q3?".sanitizeFileName())
         assertEquals("Untitled note", "   ".sanitizeFileName())

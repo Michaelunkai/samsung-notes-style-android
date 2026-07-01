@@ -1429,6 +1429,16 @@ fun SNote.checklistProgressLabel(): String? {
     return "$done/$total $itemLabel done"
 }
 
+fun SNote.mediaCardLabel(): String? {
+    val attachments = blocks.count { it is NoteBlock.Attachment }
+    val audio = blocks.count { it is NoteBlock.Audio }
+    val parts = buildList {
+        if (attachments > 0) add("$attachments file${if (attachments == 1) "" else "s"}")
+        if (audio > 0) add("$audio audio")
+    }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
+}
+
 fun formatTimestamp(timestamp: Long): String =
     SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(timestamp))
 
@@ -2419,6 +2429,16 @@ fun NoteCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                note.mediaCardLabel()?.let { media ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        media,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
