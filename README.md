@@ -12,14 +12,15 @@ Native Android prototype for a Samsung Notes-style note-taking app.
 - Handwriting/drawing blocks with color palette, stroke capture, clear, and vector JSON persistence.
 - Attachment blocks using Android's document picker.
 - Audio recording blocks using `MediaRecorder` and runtime microphone permission.
-- Local offline-first JSON persistence in app-private storage.
+- Local offline-first persistence in app-private storage.
+- Room-backed offline persistence with a first-run migration path from the legacy JSON note store.
 - Home-screen widget provider and static launcher shortcuts for quick access.
 - Android share target for incoming text.
 
 ## Important implementation notes
 
 - This is a functional local prototype, not a full production Samsung Notes replacement.
-- The current persistence layer is file-backed JSON to keep the blank workspace buildable without code generation. The next production step is replacing it with Room entities and migrations.
+- The current persistence layer uses Room for indexed note metadata and stores mixed note blocks as JSON payloads. The next production step is splitting pages, ink strokes, attachments, and audio timeline events into their own Room tables.
 - Cloud sync, OCR, PDF annotation, conflict resolution, encrypted backups, locked notes, and real-time collaboration remain architectural phases from the original plan.
 - Samsung-owned assets, names, formats, and account APIs are intentionally not used.
 

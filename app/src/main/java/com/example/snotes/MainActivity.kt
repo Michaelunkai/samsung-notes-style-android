@@ -115,12 +115,16 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -242,9 +246,9 @@ data class NotesUiState(
 }
 
 class NotesViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = FileNoteRepository(application)
+    private val repository = RoomNoteRepository(application)
     private val _state = MutableStateFlow(
-        NotesUiState(notes = repository.load().ifEmpty { listOf(sampleNote()) })
+        NotesUiState(notes = loadInitialNotes())
     )
     val state: StateFlow<NotesUiState> = _state
 
@@ -340,7 +344,19 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun persist() {
-        repository.save(_state.value.notes)
+        val notes = _state.value.notes
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.save(notes)
+        }
+    }
+
+    private fun loadInitialNotes(): List<SNote> = runBlocking(Dispatchers.IO) {
+        val loaded = repository.load()
+        if (loaded.isNotEmpty()) {
+            loaded
+        } else {
+            listOf(sampleNote()).also { repository.save(it) }
+        }
     }
 
     private fun sampleNote() = SNote(
@@ -383,24 +399,6 @@ enum class NewNoteKind(val title: String) {
     Text("New note"),
     Checklist("New checklist"),
     Drawing("New sketch")
-}
-
-class FileNoteRepository(context: Context) {
-    private val file = File(context.filesDir, "notes.json")
-
-    fun load(): List<SNote> = runCatching {
-        if (!file.exists()) return emptyList()
-        val array = JSONArray(file.readText())
-        buildList {
-            for (i in 0 until array.length()) add(array.getJSONObject(i).toNote())
-        }
-    }.getOrDefault(emptyList())
-
-    fun save(notes: List<SNote>) {
-        val array = JSONArray()
-        notes.forEach { array.put(it.toJson()) }
-        file.writeText(array.toString(2))
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
