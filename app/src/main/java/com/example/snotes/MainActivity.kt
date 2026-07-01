@@ -81,6 +81,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -2781,10 +2782,10 @@ fun DrawScope.drawPageTemplate(template: PageTemplate) {
 
 @Composable
 fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesViewModel) {
+    val context = LocalContext.current
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (block.isImageAttachment) {
-                val context = LocalContext.current
                 val bitmap = remember(block.uri) {
                     runCatching {
                         context.contentResolver.openInputStream(Uri.parse(block.uri))?.use { stream ->
@@ -2817,6 +2818,19 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                IconButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent.createChooser(block.toViewIntent(), "Open attachment"))
+                        }.onSuccess {
+                            viewModel.setStatus("Opening attachment")
+                        }.onFailure {
+                            viewModel.setStatus("No app can open attachment")
+                        }
+                    }
+                ) {
+                    Icon(Icons.Default.OpenInNew, "Open attachment")
+                }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete attachment")
                 }
@@ -2847,6 +2861,14 @@ fun queryAttachmentMetadata(context: Context, uri: Uri): AttachmentMetadata {
 
 val NoteBlock.Attachment.isImageAttachment: Boolean
     get() = mimeHint.startsWith("image/")
+
+val NoteBlock.Attachment.viewMimeType: String
+    get() = mimeHint.ifBlank { "*/*" }
+
+fun NoteBlock.Attachment.toViewIntent(): Intent =
+    Intent(Intent.ACTION_VIEW)
+        .setDataAndType(Uri.parse(uri), viewMimeType)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
 val NoteBlock.Attachment.sizeLabel: String
     get() = formatBytes(sizeBytes)

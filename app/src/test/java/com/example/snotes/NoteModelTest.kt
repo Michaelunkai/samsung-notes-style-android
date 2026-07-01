@@ -586,6 +586,8 @@ class NoteModelTest {
 
         assertTrue(image.isImageAttachment)
         assertFalse(file.isImageAttachment)
+        assertEquals("image/jpeg", image.viewMimeType)
+        assertEquals("*/*", file.copy(mimeHint = "").viewMimeType)
         assertEquals("2 MB", image.sizeLabel)
         assertEquals("900 B", file.sizeLabel)
         assertEquals("", formatBytes(0))
