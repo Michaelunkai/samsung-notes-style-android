@@ -219,6 +219,7 @@ class NoteModelTest {
         val checklist = NewNoteKind.Checklist.createNoteWithDefaults(defaults)
         val sticky = NewNoteKind.Sticky.createNoteWithDefaults(defaults)
         val drawing = NewNoteKind.Drawing.createNoteWithDefaults(defaults)
+        val meeting = NewNoteKind.Meeting.createNoteWithDefaults(defaults)
 
         assertEquals(PageTemplate.Dotted, text.pageTemplate)
         assertEquals(0xFFEFF6FF, text.paperColor)
@@ -226,9 +227,13 @@ class NoteModelTest {
         assertTrue(checklist.blocks.single() is NoteBlock.Checklist)
         assertTrue(sticky.blocks.single() is NoteBlock.Sticky)
         assertTrue(drawing.blocks.single() is NoteBlock.Drawing)
+        assertEquals("Meeting note", meeting.title)
+        assertEquals(3, meeting.blocks.size)
+        assertTrue(meeting.blocks[1] is NoteBlock.Checklist)
         assertEquals(PageTemplate.Dotted, checklist.pageTemplate)
         assertEquals(PageTemplate.Dotted, sticky.pageTemplate)
         assertEquals(0xFFEFF6FF, drawing.paperColor)
+        assertEquals(PageTemplate.Dotted, meeting.pageTemplate)
     }
 
     @Test
@@ -242,11 +247,14 @@ class NoteModelTest {
 
         val folderNote = NewNoteKind.Text.createNoteForState(folderState)
         val tagNote = NewNoteKind.Checklist.createNoteForState(tagState)
+        val meetingNote = NewNoteKind.Meeting.createNoteForState(folderState)
 
         assertEquals("Work/Product", folderNote.folder)
         assertEquals(PageTemplate.Grid, folderNote.pageTemplate)
         assertEquals(listOf("launch"), tagNote.tags)
         assertTrue(tagNote.blocks.single() is NoteBlock.Checklist)
+        assertEquals("Work/Product", meetingNote.folder)
+        assertTrue(meetingNote.blocks.any { it is NoteBlock.Checklist })
     }
 
     @Test
