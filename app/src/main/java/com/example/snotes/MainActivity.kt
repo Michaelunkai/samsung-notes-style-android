@@ -1783,6 +1783,10 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
     var sortMenuOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var unlockTarget by remember { mutableStateOf<SNote?>(null) }
+    val requestPinSetup = {
+        settingsOpen = true
+        viewModel.setStatus("Set a Notes PIN to lock notes")
+    }
     var pendingBackupText by remember { mutableStateOf("") }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -2032,7 +2036,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
             )
             Spacer(Modifier.height(8.dp))
             if (state.isSelectionMode) {
-                SelectionActionBar(state, viewModel)
+                SelectionActionBar(state, viewModel, onRequestPinSetup = requestPinSetup)
                 Spacer(Modifier.height(8.dp))
             }
             if (state.visibleNotes.isEmpty()) {
@@ -2061,19 +2065,21 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                     when {
                                         note.deleted -> Unit
                                         note.locked && state.hasNotePin -> unlockTarget = note
-                                        note.locked -> viewModel.setStatus("Set a Notes PIN in Settings first")
+                                        note.locked -> requestPinSetup()
                                         else -> viewModel.selectNote(note.id)
                                     }
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
                             onOpenLocked = {
-                                if (state.hasNotePin) unlockTarget = note else viewModel.setStatus("Set a Notes PIN in Settings first")
+                                if (state.hasNotePin) unlockTarget = note else requestPinSetup()
                             },
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
-                            onToggleLock = { viewModel.toggleLocked(note) },
+                            onToggleLock = {
+                                if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
+                            },
                             onMoveToTrash = { viewModel.deleteNote(note) },
                             onRestore = { viewModel.restoreNote(note) },
                             onPermanentDelete = { viewModel.permanentlyDeleteNote(note) }
@@ -2099,19 +2105,21 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                     when {
                                         note.deleted -> Unit
                                         note.locked && state.hasNotePin -> unlockTarget = note
-                                        note.locked -> viewModel.setStatus("Set a Notes PIN in Settings first")
+                                        note.locked -> requestPinSetup()
                                         else -> viewModel.selectNote(note.id)
                                     }
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
                             onOpenLocked = {
-                                if (state.hasNotePin) unlockTarget = note else viewModel.setStatus("Set a Notes PIN in Settings first")
+                                if (state.hasNotePin) unlockTarget = note else requestPinSetup()
                             },
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
-                            onToggleLock = { viewModel.toggleLocked(note) },
+                            onToggleLock = {
+                                if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
+                            },
                             onMoveToTrash = { viewModel.deleteNote(note) },
                             onRestore = { viewModel.restoreNote(note) },
                             onPermanentDelete = { viewModel.permanentlyDeleteNote(note) }
@@ -2171,7 +2179,7 @@ fun EmptyNotesState(copy: EmptyNotesCopy, onCreateNote: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
+fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequestPinSetup: () -> Unit) {
     var moveDialogOpen by remember { mutableStateOf(false) }
     var tagDialogOpen by remember { mutableStateOf(false) }
     var removeTagDialogOpen by remember { mutableStateOf(false) }
@@ -2258,7 +2266,7 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
                 Text("Duplicate")
             }
             if (state.selectedNotesIncludeUnlocked) {
-                Button(onClick = { viewModel.batchLockSelected(true) }) {
+                Button(onClick = { if (state.hasNotePin) viewModel.batchLockSelected(true) else onRequestPinSetup() }) {
                     Text("Lock")
                 }
             }
