@@ -310,6 +310,21 @@ class NoteModelTest {
     }
 
     @Test
+    fun uiStateKnowsWhenAllVisibleNotesAreSelected() {
+        val work = SNote(id = "work", folder = "Work")
+        val home = SNote(id = "home", folder = "Home")
+        val state = NotesUiState(
+            notes = listOf(work, home),
+            folderFilter = "Work",
+            selectedNoteIds = setOf("work")
+        )
+
+        assertEquals(listOf("work"), state.visibleNotes.map { it.id })
+        assertTrue(state.allVisibleNotesSelected)
+        assertFalse(state.copy(selectedNoteIds = setOf("home")).allVisibleNotesSelected)
+    }
+
+    @Test
     fun launchRequestParserRoutesSharedTextAndQuickNotes() {
         val shared = noteLaunchRequestFrom(
             action = "android.intent.action.SEND",

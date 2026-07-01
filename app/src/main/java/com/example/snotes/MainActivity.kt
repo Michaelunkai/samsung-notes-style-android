@@ -528,6 +528,9 @@ data class NotesUiState(
     val isSelectionMode: Boolean
         get() = selectedNoteIds.isNotEmpty()
 
+    val allVisibleNotesSelected: Boolean
+        get() = visibleNotes.isNotEmpty() && visibleNotes.all { it.id in selectedNoteIds }
+
     val selectedNotesIncludePinned: Boolean
         get() = selectedNotes.any { it.pinned }
 
@@ -720,6 +723,17 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSelection() {
         _state.update { it.copy(selectedNoteIds = emptySet()) }
+    }
+
+    fun selectVisibleNotes() {
+        _state.update { state ->
+            val visibleIds = state.visibleNotes.map { it.id }.toSet()
+            state.copy(
+                selectedNoteIds = visibleIds,
+                selectedNoteId = null,
+                statusMessage = "Selected ${visibleIds.size} note${if (visibleIds.size == 1) "" else "s"}"
+            )
+        }
     }
 
     fun setSearch(search: String) {
@@ -1931,6 +1945,11 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
         )
     }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (!state.allVisibleNotesSelected) {
+            OutlinedButton(onClick = viewModel::selectVisibleNotes) {
+                Text("Select all")
+            }
+        }
         if (state.surface == NotesSurface.Trash) {
             Button(onClick = viewModel::batchRestoreSelected) {
                 Text("Restore")
