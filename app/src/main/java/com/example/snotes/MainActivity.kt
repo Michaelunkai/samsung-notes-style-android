@@ -475,6 +475,13 @@ fun renameTagList(tags: List<String>, from: String, to: String): List<String> {
     return tags.map { tag -> if (tag == source) target else tag }.distinct()
 }
 
+fun List<SNote>.removeTagFromNotes(tag: String): List<SNote> {
+    val target = parseTagInput(tag).firstOrNull() ?: return this
+    return map { note ->
+        if (target in note.tags) note.copy(tags = removeTags(note.tags, target)) else note
+    }
+}
+
 fun SharedPreferences.loadNoteDefaults(): NoteDefaults =
     noteDefaultsFromStoredValues(
         templateName = getString(SETTING_DEFAULT_PAGE_TEMPLATE, PageTemplate.Plain.name),
@@ -1079,6 +1086,24 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
                 notes = state.notes.map { note -> note.copy(tags = renameTagList(note.tags, from, target)) },
                 tagFilter = state.tagFilter?.let { if (it == from) target else it },
                 statusMessage = "Tag renamed"
+            )
+        }
+        persist()
+    }
+
+    fun deleteTag(tag: String) {
+        val target = parseTagInput(tag).firstOrNull()
+        if (target == null) {
+            _state.update { it.copy(statusMessage = "Enter a tag") }
+            return
+        }
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.removeTagFromNotes(target),
+                surface = NotesSurface.All,
+                tagFilter = null,
+                selectedNoteIds = emptySet(),
+                statusMessage = "Tag #$target removed from notes"
             )
         }
         persist()
@@ -2182,10 +2207,16 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
             )
         }
         if (state.surface == NotesSurface.Tags && state.tagFilter != null) {
+            val selectedTag = state.tagFilter
             AssistChip(
-                onClick = { tagRenameTarget = state.tagFilter },
+                onClick = { tagRenameTarget = selectedTag },
                 label = { Text("Rename tag") },
                 leadingIcon = { Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+            AssistChip(
+                onClick = { viewModel.deleteTag(selectedTag) },
+                label = { Text("Delete tag") },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp)) }
             )
         }
         if (state.surface == NotesSurface.Trash && state.trashCount > 0) {

@@ -731,6 +731,23 @@ class NoteModelTest {
     }
 
     @Test
+    fun removeTagFromNotesDeletesTagWithoutDeletingNotes() {
+        val notes = listOf(
+            SNote(id = "one", tags = listOf("work", "launch")),
+            SNote(id = "two", tags = listOf("personal")),
+            SNote(id = "three", tags = listOf("work"), deleted = true)
+        )
+
+        val updated = notes.removeTagFromNotes("#work")
+
+        assertEquals(listOf("one", "two", "three"), updated.map { it.id })
+        assertEquals(listOf("launch"), updated.first { it.id == "one" }.tags)
+        assertEquals(listOf("personal"), updated.first { it.id == "two" }.tags)
+        assertTrue(updated.first { it.id == "three" }.tags.isEmpty())
+        assertTrue(updated.first { it.id == "three" }.deleted)
+    }
+
+    @Test
     fun widgetSummaryShowsLatestVisibleNoteWithoutLockedPreview() {
         val empty = notesWidgetSummary(emptyList())
         val normal = notesWidgetSummary(
