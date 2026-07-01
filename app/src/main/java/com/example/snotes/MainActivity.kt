@@ -295,7 +295,8 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         override val id: String = UUID.randomUUID().toString(),
         val path: String,
         val name: String,
-        val durationHintMs: Long = 0L
+        val durationHintMs: Long = 0L,
+        val markers: List<AudioMarker> = emptyList()
     ) : NoteBlock(id, "Audio")
 }
 
@@ -310,6 +311,12 @@ data class ChecklistProgress(val done: Int, val total: Int) {
         get() = "$done/$total done"
 }
 
+data class AudioMarker(
+    val id: String = UUID.randomUUID().toString(),
+    val label: String,
+    val timestampMs: Long
+)
+
 data class NoteDetails(
     val blockCount: Int,
     val wordCount: Int,
@@ -318,7 +325,8 @@ data class NoteDetails(
     val stickyNotes: Int,
     val drawingStrokes: Int,
     val attachments: Int,
-    val audioBlocks: Int
+    val audioBlocks: Int,
+    val audioMarkers: Int
 )
 
 data class SearchMatch(val scope: SearchScope, val label: String)
@@ -1060,7 +1068,10 @@ fun NoteBlock.duplicateBlock(): NoteBlock = when (this) {
         strokes = strokes.map { stroke -> stroke.copy(id = UUID.randomUUID().toString()) }
     )
     is NoteBlock.Attachment -> copy(id = UUID.randomUUID().toString())
-    is NoteBlock.Audio -> copy(id = UUID.randomUUID().toString())
+    is NoteBlock.Audio -> copy(
+        id = UUID.randomUUID().toString(),
+        markers = markers.map { it.copy(id = UUID.randomUUID().toString()) }
+    )
 }
 
 fun SNote.duplicateBlockAfter(blockId: String): SNote {
@@ -1107,7 +1118,8 @@ fun SNote.details(): NoteDetails = NoteDetails(
     stickyNotes = blocks.count { it is NoteBlock.Sticky },
     drawingStrokes = blocks.filterIsInstance<NoteBlock.Drawing>().sumOf { it.strokes.size },
     attachments = blocks.count { it is NoteBlock.Attachment },
-    audioBlocks = blocks.count { it is NoteBlock.Audio }
+    audioBlocks = blocks.count { it is NoteBlock.Audio },
+    audioMarkers = blocks.filterIsInstance<NoteBlock.Audio>().sumOf { it.markers.size }
 )
 
 fun formatTimestamp(timestamp: Long): String =
@@ -1146,7 +1158,13 @@ fun NoteBlock.toPlainText(): String = when (this) {
     }
     is NoteBlock.Drawing -> "[Handwriting: ${strokes.size} stroke${if (strokes.size == 1) "" else "s"}]"
     is NoteBlock.Attachment -> "[Attachment: $name${sizeLabel.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
-    is NoteBlock.Audio -> "[Audio: $name${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
+    is NoteBlock.Audio -> buildString {
+        append("[Audio: $name${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]")
+        markers.forEach { marker ->
+            appendLine()
+            append("- ${formatDuration(marker.timestampMs)} ${marker.label}")
+        }
+    }
 }
 
 val NoteBlock.importedName: String?
@@ -2416,6 +2434,7 @@ fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
                 DetailRow("Ink strokes", details.drawingStrokes.toString())
                 DetailRow("Attachments", details.attachments.toString())
                 DetailRow("Audio", details.audioBlocks.toString())
+                DetailRow("Audio markers", details.audioMarkers.toString())
             }
         },
         confirmButton = {
@@ -3298,46 +3317,74 @@ fun AudioBlock(note: SNote, block: NoteBlock.Audio, viewModel: NotesViewModel) {
         }
     }
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilledIconButton(
-                onClick = {
-                    if (playing) {
-                        runCatching {
-                            player.stop()
-                            player.reset()
-                        }
-                        playing = false
-                    } else {
-                        runCatching {
-                            player.reset()
-                            player.setAudioSource(context, block.path)
-                            player.setOnCompletionListener { playing = false }
-                            player.prepare()
-                            player.start()
-                            playing = true
-                        }.onFailure {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FilledIconButton(
+                    onClick = {
+                        if (playing) {
+                            runCatching {
+                                player.stop()
+                                player.reset()
+                            }
                             playing = false
+                        } else {
+                            runCatching {
+                                player.reset()
+                                player.setAudioSource(context, block.path)
+                                player.setOnCompletionListener { playing = false }
+                                player.prepare()
+                                player.start()
+                                playing = true
+                            }.onFailure {
+                                playing = false
+                            }
+                        }
+                    }
+                ) {
+                    Icon(if (playing) Icons.Default.Stop else Icons.Default.PlayArrow, if (playing) "Stop audio" else "Play audio")
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(block.name, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        listOf(formatDuration(block.durationHintMs), block.path).filter { it.isNotBlank() }.joinToString(" • "),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        val timestamp = runCatching { player.currentPosition.toLong() }.getOrDefault(0L)
+                        viewModel.updateBlock(note, block.addMarker(timestamp))
+                    }
+                ) {
+                    Text("Marker")
+                }
+                IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                    Icon(Icons.Default.ContentCopy, "Duplicate audio")
+                }
+                IconButton(onClick = { viewModel.removeBlock(note, block) }) {
+                    Icon(Icons.Default.Delete, "Delete audio")
+                }
+            }
+            if (block.markers.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    block.markers.sortedBy { it.timestampMs }.forEach { marker ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                formatDuration(marker.timestampMs).ifBlank { "0:00" },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.width(48.dp)
+                            )
+                            Text(marker.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { viewModel.updateBlock(note, block.removeMarker(marker.id)) }) {
+                                Icon(Icons.Default.Delete, "Delete audio marker")
+                            }
                         }
                     }
                 }
-            ) {
-                Icon(if (playing) Icons.Default.Stop else Icons.Default.PlayArrow, if (playing) "Stop audio" else "Play audio")
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(block.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    listOf(formatDuration(block.durationHintMs), block.path).filter { it.isNotBlank() }.joinToString(" • "),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
-                Icon(Icons.Default.ContentCopy, "Duplicate audio")
-            }
-            IconButton(onClick = { viewModel.removeBlock(note, block) }) {
-                Icon(Icons.Default.Delete, "Delete audio")
             }
         }
     }
@@ -3424,11 +3471,18 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
                 ) {
                     add(EditorSearchMatch(block.id, "Attachment", block.name.searchSnippet(normalized)))
                 }
-                is NoteBlock.Audio -> if (
-                    block.name.contains(normalized, ignoreCase = true) ||
-                    block.path.contains(normalized, ignoreCase = true)
-                ) {
-                    add(EditorSearchMatch(block.id, "Audio", block.name.searchSnippet(normalized)))
+                is NoteBlock.Audio -> {
+                    if (
+                        block.name.contains(normalized, ignoreCase = true) ||
+                        block.path.contains(normalized, ignoreCase = true)
+                    ) {
+                        add(EditorSearchMatch(block.id, "Audio", block.name.searchSnippet(normalized)))
+                    }
+                    block.markers
+                        .filter { marker -> marker.label.contains(normalized, ignoreCase = true) }
+                        .forEach { marker ->
+                            add(EditorSearchMatch(block.id, "Audio marker ${formatDuration(marker.timestampMs).ifBlank { "0:00" }}", marker.label.searchSnippet(normalized)))
+                        }
                 }
                 is NoteBlock.Drawing -> Unit
             }
@@ -3442,6 +3496,9 @@ fun NoteBlock.contentSearchLabels(query: String): List<String> = when (this) {
     is NoteBlock.Checklist -> items
         .filter { it.text.contains(query, ignoreCase = true) }
         .map { "Checklist: ${it.text.searchSnippet(query)}" }
+    is NoteBlock.Audio -> markers
+        .filter { it.label.contains(query, ignoreCase = true) }
+        .map { "Audio marker: ${formatDuration(it.timestampMs).ifBlank { "0:00" }} ${it.label.searchSnippet(query)}" }
     else -> emptyList()
 }
 
@@ -3496,6 +3553,14 @@ fun NoteBlock.Checklist.clearCompleted(): NoteBlock.Checklist =
 
 fun NoteBlock.Checklist.setAllChecked(checked: Boolean): NoteBlock.Checklist =
     copy(items = items.map { it.copy(checked = checked) })
+
+fun NoteBlock.Audio.addMarker(timestampMs: Long): NoteBlock.Audio {
+    val timestamp = timestampMs.coerceAtLeast(0L)
+    return copy(markers = markers + AudioMarker(label = "Marker ${markers.size + 1}", timestampMs = timestamp))
+}
+
+fun NoteBlock.Audio.removeMarker(markerId: String): NoteBlock.Audio =
+    copy(markers = markers.filterNot { it.id == markerId })
 
 class AudioRecorder(private val context: Context) {
     private var recorder: MediaRecorder? = null
@@ -3631,6 +3696,16 @@ fun NoteBlock.toJson(): JSONObject {
             .put("path", path)
             .put("name", name)
             .put("durationHintMs", durationHintMs)
+            .put("markers", JSONArray().also { markerArray ->
+                markers.forEach { marker ->
+                    markerArray.put(
+                        JSONObject()
+                            .put("id", marker.id)
+                            .put("label", marker.label)
+                            .put("timestampMs", marker.timestampMs)
+                    )
+                }
+            })
     }
 }
 
@@ -3700,7 +3775,8 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         id = optString("id", UUID.randomUUID().toString()),
         path = optString("path"),
         name = optString("name", "Recording"),
-        durationHintMs = optLong("durationHintMs", 0L)
+        durationHintMs = optLong("durationHintMs", 0L),
+        markers = optJSONArray("markers").toAudioMarkers()
     )
 
     else -> NoteBlock.Text(
@@ -3727,6 +3803,23 @@ fun JSONArray?.toCheckItems(): List<CheckItem> {
                     id = item.optString("id", UUID.randomUUID().toString()),
                     text = item.optString("text"),
                     checked = item.optBoolean("checked", false)
+                )
+            )
+        }
+    }
+}
+
+fun JSONArray?.toAudioMarkers(): List<AudioMarker> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (i in 0 until length()) {
+            val marker = optJSONObject(i) ?: continue
+            val label = marker.optString("label", "Marker ${i + 1}").ifBlank { "Marker ${i + 1}" }
+            add(
+                AudioMarker(
+                    id = marker.optString("id", UUID.randomUUID().toString()),
+                    label = label,
+                    timestampMs = marker.optLong("timestampMs", 0L).coerceAtLeast(0L)
                 )
             )
         }

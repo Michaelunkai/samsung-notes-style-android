@@ -45,7 +45,11 @@ class NoteModelTest {
                     )
                 ),
                 NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", mimeHint = "application/pdf", sizeBytes = 2048),
-                NoteBlock.Audio(path = "/recordings/one.m4a", name = "one.m4a")
+                NoteBlock.Audio(
+                    path = "/recordings/one.m4a",
+                    name = "one.m4a",
+                    markers = listOf(AudioMarker(id = "marker", label = "Decision point", timestampMs = 12_000))
+                )
             )
         )
 
@@ -74,6 +78,8 @@ class NoteModelTest {
         assertEquals("brief.pdf", (restored.blocks[4] as NoteBlock.Attachment).name)
         assertEquals("2 KB", (restored.blocks[4] as NoteBlock.Attachment).sizeLabel)
         assertEquals("one.m4a", (restored.blocks[5] as NoteBlock.Audio).name)
+        assertEquals("Decision point", (restored.blocks[5] as NoteBlock.Audio).markers.single().label)
+        assertEquals(12_000, (restored.blocks[5] as NoteBlock.Audio).markers.single().timestampMs)
     }
 
     @Test
@@ -107,7 +113,11 @@ class NoteModelTest {
                 NoteBlock.Checklist(items = listOf(CheckItem(text = "Collect launch assets"))),
                 NoteBlock.Sticky(text = "Launch sticky reminder"),
                 NoteBlock.Attachment(uri = "content://example/deck", name = "launch-deck.pdf", mimeHint = "application/pdf"),
-                NoteBlock.Audio(path = "/audio/launch-briefing.m4a", name = "launch-briefing.m4a")
+                NoteBlock.Audio(
+                    path = "/audio/launch-briefing.m4a",
+                    name = "launch-briefing.m4a",
+                    markers = listOf(AudioMarker(label = "Launch decision", timestampMs = 18_000))
+                )
             )
         )
 
@@ -117,6 +127,7 @@ class NoteModelTest {
         assertTrue(note.searchMatches("roadmap", SearchScope.Content).single().label.startsWith("Text:"))
         assertTrue(note.searchMatches("assets", SearchScope.Content).single().label.startsWith("Checklist:"))
         assertTrue(note.searchMatches("sticky", SearchScope.Content).single().label.startsWith("Sticky:"))
+        assertTrue(note.searchMatches("decision", SearchScope.Content).single().label.startsWith("Audio marker:"))
         assertEquals(
             listOf("File: launch-deck.pdf", "Audio: launch-briefing.m4a"),
             note.searchMatches("launch", SearchScope.Attachments).map { it.label }
@@ -145,14 +156,19 @@ class NoteModelTest {
                 ),
                 NoteBlock.Sticky(id = "sticky", text = "Launch sticky reminder"),
                 NoteBlock.Attachment(id = "file", uri = "content://example/file", name = "launch-deck.pdf"),
-                NoteBlock.Audio(id = "audio", path = "/audio/launch-briefing.m4a", name = "launch-briefing.m4a")
+                NoteBlock.Audio(
+                    id = "audio",
+                    path = "/audio/launch-briefing.m4a",
+                    name = "launch-briefing.m4a",
+                    markers = listOf(AudioMarker(label = "Launch decision", timestampMs = 18_000))
+                )
             )
         )
 
         val matches = note.editorSearchMatches("launch")
 
         assertEquals(
-            listOf(null, null, null, "text", "checklist", "sticky", "file", "audio"),
+            listOf(null, null, null, "text", "checklist", "sticky", "file", "audio", "audio"),
             matches.map { it.blockId }
         )
         assertEquals("Title", matches[0].label)
@@ -160,6 +176,7 @@ class NoteModelTest {
         assertEquals("Tag", matches[2].label)
         assertEquals("Checklist item (open)", matches[4].label)
         assertEquals("Sticky note", matches[5].label)
+        assertEquals("Audio marker 0:18", matches[8].label)
         assertTrue(matches.all { it.snippet.contains("launch", ignoreCase = true) })
         assertTrue(note.editorSearchMatches("   ").isEmpty())
     }
@@ -304,6 +321,12 @@ class NoteModelTest {
                 NoteBlock.Drawing(
                     id = "drawing",
                     strokes = listOf(DrawStroke(id = "stroke", color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 2f))))
+                ),
+                NoteBlock.Audio(
+                    id = "audio",
+                    path = "/audio/brief.m4a",
+                    name = "brief.m4a",
+                    markers = listOf(AudioMarker(id = "marker", label = "Decision", timestampMs = 3_000))
                 )
             )
         )
@@ -322,6 +345,7 @@ class NoteModelTest {
         assertTrue(duplicate.blocks[0].id != original.blocks[0].id)
         assertTrue((duplicate.blocks[1] as NoteBlock.Checklist).items.single().id != "item")
         assertTrue((duplicate.blocks[2] as NoteBlock.Drawing).strokes.single().id != "stroke")
+        assertTrue((duplicate.blocks[3] as NoteBlock.Audio).markers.single().id != "marker")
     }
 
     @Test
@@ -356,6 +380,12 @@ class NoteModelTest {
                 NoteBlock.Drawing(
                     id = "drawing",
                     strokes = listOf(DrawStroke(id = "stroke", color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))
+                ),
+                NoteBlock.Audio(
+                    id = "audio",
+                    path = "/audio/block.m4a",
+                    name = "block.m4a",
+                    markers = listOf(AudioMarker(id = "marker", label = "Question", timestampMs = 7_000))
                 )
             )
         )
@@ -366,17 +396,22 @@ class NoteModelTest {
         val stickyCopy = withStickyCopy.blocks[3] as NoteBlock.Sticky
         val withDrawingCopy = note.duplicateBlockAfter("drawing")
         val drawingCopy = withDrawingCopy.blocks[4] as NoteBlock.Drawing
+        val withAudioCopy = note.duplicateBlockAfter("audio")
+        val audioCopy = withAudioCopy.blocks[5] as NoteBlock.Audio
 
-        assertEquals(listOf("text", "list", checklistCopy.id, "sticky", "drawing"), withChecklistCopy.blocks.map { it.id })
+        assertEquals(listOf("text", "list", checklistCopy.id, "sticky", "drawing", "audio"), withChecklistCopy.blocks.map { it.id })
         assertTrue(checklistCopy.id != "list")
         assertEquals("Task", checklistCopy.items.single().text)
         assertTrue(checklistCopy.items.single().id != "item")
-        assertEquals(listOf("text", "list", "sticky", stickyCopy.id, "drawing"), withStickyCopy.blocks.map { it.id })
+        assertEquals(listOf("text", "list", "sticky", stickyCopy.id, "drawing", "audio"), withStickyCopy.blocks.map { it.id })
         assertEquals("Note", stickyCopy.text)
         assertTrue(stickyCopy.collapsed)
         assertTrue(stickyCopy.id != "sticky")
         assertTrue(drawingCopy.id != "drawing")
         assertTrue(drawingCopy.strokes.single().id != "stroke")
+        assertTrue(audioCopy.id != "audio")
+        assertEquals("Question", audioCopy.markers.single().label)
+        assertTrue(audioCopy.markers.single().id != "marker")
         assertEquals(note.blocks.map { it.id }, note.duplicateBlockAfter("missing").blocks.map { it.id })
     }
 
@@ -397,7 +432,12 @@ class NoteModelTest {
                 NoteBlock.Sticky(text = "Remember stakeholder questions"),
                 NoteBlock.Drawing(strokes = listOf(DrawStroke(color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))),
                 NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
-                NoteBlock.Audio(path = "/audio/review.m4a", name = "review.m4a", durationHintMs = 65_000)
+                NoteBlock.Audio(
+                    path = "/audio/review.m4a",
+                    name = "review.m4a",
+                    durationHintMs = 65_000,
+                    markers = listOf(AudioMarker(label = "Stakeholder question", timestampMs = 12_000))
+                )
             )
         )
 
@@ -413,6 +453,7 @@ class NoteModelTest {
         assertTrue(text.contains("[Handwriting: 1 stroke]"))
         assertTrue(text.contains("[Attachment: brief.pdf, 2 KB]"))
         assertTrue(text.contains("[Audio: review.m4a, 1:05]"))
+        assertTrue(text.contains("- 0:12 Stakeholder question"))
     }
 
     @Test
@@ -429,7 +470,11 @@ class NoteModelTest {
                 NoteBlock.Sticky(text = "alpha sticky note"),
                 NoteBlock.Drawing(strokes = listOf(DrawStroke(color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))),
                 NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
-                NoteBlock.Audio(path = "/audio/review.m4a", name = "review.m4a")
+                NoteBlock.Audio(
+                    path = "/audio/review.m4a",
+                    name = "review.m4a",
+                    markers = listOf(AudioMarker(label = "Intro", timestampMs = 5_000))
+                )
             )
         )
 
@@ -443,6 +488,7 @@ class NoteModelTest {
         assertEquals(1, details.drawingStrokes)
         assertEquals(1, details.attachments)
         assertEquals(1, details.audioBlocks)
+        assertEquals(1, details.audioMarkers)
     }
 
     @Test
@@ -548,7 +594,12 @@ class NoteModelTest {
             paperColor = 0xFFFFF8D6,
             blocks = listOf(
                 NoteBlock.Text(text = "Momentum notes", highlight = 0xFFFFFF00),
-                NoteBlock.Audio(path = "/audio/lecture.m4a", name = "lecture.m4a", durationHintMs = 42_000),
+                NoteBlock.Audio(
+                    path = "/audio/lecture.m4a",
+                    name = "lecture.m4a",
+                    durationHintMs = 42_000,
+                    markers = listOf(AudioMarker(label = "Exam topic", timestampMs = 21_000))
+                ),
                 NoteBlock.Drawing(
                     strokes = listOf(
                         DrawStroke(
@@ -574,6 +625,7 @@ class NoteModelTest {
         assertEquals("Momentum notes", restored.preview)
         assertEquals(3, restored.blocks.size)
         assertEquals("lecture.m4a", (restored.blocks[1] as NoteBlock.Audio).name)
+        assertEquals("Exam topic", (restored.blocks[1] as NoteBlock.Audio).markers.single().label)
         assertEquals(2, (restored.blocks[2] as NoteBlock.Drawing).strokes.single().points.size)
     }
 
@@ -724,6 +776,7 @@ class NoteModelTest {
         assertTrue(audio is NoteBlock.Audio)
         assertEquals("content://example/audio", (audio as NoteBlock.Audio).path)
         assertEquals("clip.m4a", audio.name)
+        assertTrue(audio.markers.isEmpty())
         assertTrue(pdf is NoteBlock.Attachment)
         assertEquals("brief.pdf", (pdf as NoteBlock.Attachment).name)
     }
@@ -734,6 +787,20 @@ class NoteModelTest {
         assertEquals("0:01", formatDuration(1_500))
         assertEquals("1:05", formatDuration(65_000))
         assertEquals("10:00", formatDuration(600_000))
+    }
+
+    @Test
+    fun audioMarkerHelpersAddAndRemoveTimelineBookmarks() {
+        val block = NoteBlock.Audio(path = "/audio/session.m4a", name = "session.m4a")
+            .addMarker(9_250)
+            .addMarker(-1_000)
+
+        assertEquals(listOf("Marker 1", "Marker 2"), block.markers.map { it.label })
+        assertEquals(listOf(9_250L, 0L), block.markers.map { it.timestampMs })
+
+        val remaining = block.removeMarker(block.markers.first().id)
+
+        assertEquals(listOf("Marker 2"), remaining.markers.map { it.label })
     }
 
     @Test
