@@ -49,6 +49,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -2109,8 +2110,20 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var editorSearchQuery by remember(note.id) { mutableStateOf("") }
     var activeSearchMatch by remember(note.id) { mutableStateOf(0) }
     val editorSearchMatches = remember(note, editorSearchQuery) { note.editorSearchMatches(editorSearchQuery) }
+    val editorListState = rememberLazyListState()
+    val activeSearchBlockId = editorSearchMatches.getOrNull(activeSearchMatch)?.blockId
     LaunchedEffect(editorSearchQuery, editorSearchMatches.size) {
         activeSearchMatch = activeSearchMatch.coerceIn(0, (editorSearchMatches.size - 1).coerceAtLeast(0))
+    }
+    LaunchedEffect(editorSearchOpen, activeSearchMatch, editorSearchMatches, note.blocks) {
+        if (editorSearchOpen && editorSearchMatches.isNotEmpty()) {
+            val targetIndex = editorSearchTargetItemIndex(
+                blocks = note.blocks,
+                match = editorSearchMatches.getOrNull(activeSearchMatch),
+                searchPanelVisible = editorSearchOpen
+            )
+            editorListState.animateScrollToItem(targetIndex)
+        }
     }
     DisposableEffect(audioRecorder) {
         onDispose {
@@ -2281,6 +2294,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             NoteDetailsDialog(note = note, onDismiss = { detailsOpen = false })
         }
         LazyColumn(
+            state = editorListState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -2340,7 +2354,19 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                             Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move block down")
                         }
                     }
-                    Box(Modifier.weight(1f)) {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .then(
+                                if (block.id == activeSearchBlockId && editorSearchOpen) {
+                                    Modifier
+                                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                                        .padding(2.dp)
+                                } else {
+                                    Modifier
+                                }
+                            )
+                    ) {
                         when (block) {
                             is NoteBlock.Text -> TextBlockEditor(note, block, viewModel)
                             is NoteBlock.Checklist -> ChecklistBlockEditor(note, block, viewModel)
@@ -3565,6 +3591,19 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
                 is NoteBlock.Drawing -> Unit
             }
         }
+    }
+}
+
+fun editorSearchTargetItemIndex(
+    blocks: List<NoteBlock>,
+    match: EditorSearchMatch?,
+    searchPanelVisible: Boolean
+): Int {
+    val blockIndex = match?.blockId?.let { id -> blocks.indexOfFirst { it.id == id } } ?: -1
+    return if (blockIndex >= 0) {
+        1 + (if (searchPanelVisible) 1 else 0) + blockIndex
+    } else {
+        0
     }
 }
 

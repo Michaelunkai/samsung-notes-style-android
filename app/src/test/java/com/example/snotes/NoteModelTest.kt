@@ -182,6 +182,19 @@ class NoteModelTest {
     }
 
     @Test
+    fun editorSearchTargetItemIndexAccountsForMetaSearchPanelAndBlockMatches() {
+        val blocks = listOf(
+            NoteBlock.Text(id = "text", text = "Body"),
+            NoteBlock.Checklist(id = "list")
+        )
+
+        assertEquals(0, editorSearchTargetItemIndex(blocks, EditorSearchMatch(null, "Title", "Body"), searchPanelVisible = true))
+        assertEquals(2, editorSearchTargetItemIndex(blocks, EditorSearchMatch("text", "Text block", "Body"), searchPanelVisible = true))
+        assertEquals(2, editorSearchTargetItemIndex(blocks, EditorSearchMatch("list", "Checklist", "Body"), searchPanelVisible = false))
+        assertEquals(0, editorSearchTargetItemIndex(blocks, EditorSearchMatch("missing", "Missing", "Body"), searchPanelVisible = true))
+    }
+
+    @Test
     fun newNoteKindsUseConfiguredDefaults() {
         val defaults = NoteDefaults(pageTemplate = PageTemplate.Dotted, paperColor = 0xFFEFF6FF)
 
