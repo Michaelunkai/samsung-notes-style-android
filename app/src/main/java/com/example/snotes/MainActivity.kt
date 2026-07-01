@@ -2544,14 +2544,33 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
 fun List<DrawStroke>.eraseNear(points: List<DrawPoint>, radius: Float): List<DrawStroke> {
     if (points.isEmpty()) return this
     val radiusSquared = radius * radius
-    return filterNot { stroke ->
-        stroke.points.any { strokePoint ->
-            points.any { eraserPoint ->
-                val dx = strokePoint.x - eraserPoint.x
-                val dy = strokePoint.y - eraserPoint.y
-                dx * dx + dy * dy <= radiusSquared
-            }
+    return flatMap { stroke ->
+        stroke.splitAroundErasedPoints(points, radiusSquared)
+    }
+}
+
+fun DrawStroke.splitAroundErasedPoints(eraserPoints: List<DrawPoint>, radiusSquared: Float): List<DrawStroke> {
+    val keptSegments = mutableListOf<List<DrawPoint>>()
+    var current = mutableListOf<DrawPoint>()
+    points.forEach { strokePoint ->
+        val erased = eraserPoints.any { eraserPoint ->
+            val dx = strokePoint.x - eraserPoint.x
+            val dy = strokePoint.y - eraserPoint.y
+            dx * dx + dy * dy <= radiusSquared
         }
+        if (erased) {
+            if (current.isNotEmpty()) {
+                keptSegments += current
+                current = mutableListOf()
+            }
+        } else {
+            current += strokePoint
+        }
+    }
+    if (current.isNotEmpty()) keptSegments += current
+    if (keptSegments.size == 1 && keptSegments.single().size == points.size) return listOf(this)
+    return keptSegments.map { segment ->
+        copy(id = UUID.randomUUID().toString(), points = segment)
     }
 }
 

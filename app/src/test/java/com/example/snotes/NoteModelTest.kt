@@ -458,7 +458,7 @@ class NoteModelTest {
         val nearby = DrawStroke(
             color = 0xFF111827,
             width = 4f,
-            points = listOf(DrawPoint(10f, 10f), DrawPoint(20f, 20f))
+            points = listOf(DrawPoint(10f, 10f), DrawPoint(14f, 14f))
         )
         val far = DrawStroke(
             color = 0xFF1D4ED8,
@@ -469,6 +469,27 @@ class NoteModelTest {
         val remaining = listOf(nearby, far).eraseNear(listOf(DrawPoint(12f, 12f)), radius = 8f)
 
         assertEquals(listOf(far), remaining)
+    }
+
+    @Test
+    fun drawingEraserPreservesUnaffectedStrokeSegments() {
+        val stroke = DrawStroke(
+            color = 0xFF111827,
+            width = 4f,
+            points = listOf(
+                DrawPoint(0f, 0f),
+                DrawPoint(8f, 8f),
+                DrawPoint(50f, 50f),
+                DrawPoint(90f, 90f)
+            )
+        )
+
+        val remaining = listOf(stroke).eraseNear(listOf(DrawPoint(50f, 50f)), radius = 4f)
+
+        assertEquals(2, remaining.size)
+        assertEquals(listOf(DrawPoint(0f, 0f), DrawPoint(8f, 8f)), remaining.first().points)
+        assertEquals(listOf(DrawPoint(90f, 90f)), remaining.last().points)
+        assertTrue(remaining.all { it.color == stroke.color && it.width == stroke.width })
     }
 
     @Test
