@@ -1247,6 +1247,9 @@ fun SNote.details(): NoteDetails = NoteDetails(
     audioMarkers = blocks.filterIsInstance<NoteBlock.Audio>().sumOf { it.markers.size }
 )
 
+fun SNote.cardMetaLabel(): String =
+    "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • $folder"
+
 fun formatTimestamp(timestamp: Long): String =
     SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(timestamp))
 
@@ -2162,6 +2165,14 @@ fun NoteCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                note.cardMetaLabel(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall
             )
             if (search.isNotBlank() && matches.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))

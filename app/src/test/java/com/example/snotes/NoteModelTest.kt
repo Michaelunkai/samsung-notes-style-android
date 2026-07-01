@@ -571,6 +571,21 @@ class NoteModelTest {
     }
 
     @Test
+    fun noteCardMetaLabelIncludesModifiedTimeBlocksAndFolder() {
+        val note = SNote(
+            folder = "Work",
+            updatedAt = 1_704_067_200_000,
+            blocks = listOf(NoteBlock.Text(text = "Body"), NoteBlock.Checklist())
+        )
+
+        val label = note.cardMetaLabel()
+
+        assertTrue(label.contains("2024") || label.contains("24"))
+        assertTrue(label.contains("2 blocks"))
+        assertTrue(label.endsWith("Work"))
+    }
+
+    @Test
     fun noteExportFileNamesAreSanitized() {
         assertEquals("Work-Plan-Q3-", "Work/Plan:Q3?".sanitizeFileName())
         assertEquals("Untitled note", "   ".sanitizeFileName())
