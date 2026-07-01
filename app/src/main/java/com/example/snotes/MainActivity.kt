@@ -357,6 +357,22 @@ fun parseTagInput(tags: String): List<String> =
 fun mergeTags(existing: List<String>, added: String): List<String> =
     (existing + parseTagInput(added)).distinct()
 
+fun renameFolderPath(folder: String, from: String, to: String): String {
+    val source = normalizeFolder(from)
+    val target = normalizeFolder(to)
+    return when {
+        folder == source -> target
+        folder.startsWith("$source/") -> target + folder.removePrefix(source)
+        else -> folder
+    }
+}
+
+fun renameTagList(tags: List<String>, from: String, to: String): List<String> {
+    val source = from.trim().removePrefix("#")
+    val target = parseTagInput(to).firstOrNull() ?: return tags
+    return tags.map { tag -> if (tag == source) target else tag }.distinct()
+}
+
 fun SharedPreferences.loadNoteDefaults(): NoteDefaults =
     noteDefaultsFromStoredValues(
         templateName = getString(SETTING_DEFAULT_PAGE_TEMPLATE, PageTemplate.Plain.name),
@@ -764,6 +780,38 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         updateSelectedNotes { it.copy(tags = mergeTags(it.tags, tags)) }
+    }
+
+    fun renameFolder(from: String, to: String) {
+        val target = normalizeFolder(to)
+        if (target == "All notes" && to.isBlank()) {
+            _state.update { it.copy(statusMessage = "Enter a folder name") }
+            return
+        }
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.map { note -> note.copy(folder = renameFolderPath(note.folder, from, target)) },
+                folderFilter = state.folderFilter?.let { renameFolderPath(it, from, target) },
+                statusMessage = "Folder renamed"
+            )
+        }
+        persist()
+    }
+
+    fun renameTag(from: String, to: String) {
+        val target = parseTagInput(to).firstOrNull()
+        if (target == null) {
+            _state.update { it.copy(statusMessage = "Enter a tag") }
+            return
+        }
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.map { note -> note.copy(tags = renameTagList(note.tags, from, target)) },
+                tagFilter = state.tagFilter?.let { if (it == from) target else it },
+                statusMessage = "Tag renamed"
+            )
+        }
+        persist()
     }
 
     fun batchMoveSelectedToTrash() {
@@ -1576,6 +1624,32 @@ fun BatchTextActionDialog(
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
+    var folderRenameTarget by remember { mutableStateOf<String?>(null) }
+    var tagRenameTarget by remember { mutableStateOf<String?>(null) }
+    folderRenameTarget?.let { folder ->
+        BatchTextActionDialog(
+            title = "Rename folder",
+            label = "Folder",
+            confirmText = "Rename",
+            onConfirm = {
+                viewModel.renameFolder(folder, it)
+                folderRenameTarget = null
+            },
+            onDismiss = { folderRenameTarget = null }
+        )
+    }
+    tagRenameTarget?.let { tag ->
+        BatchTextActionDialog(
+            title = "Rename tag",
+            label = "Tag",
+            confirmText = "Rename",
+            onConfirm = {
+                viewModel.renameTag(tag, it)
+                tagRenameTarget = null
+            },
+            onDismiss = { tagRenameTarget = null }
+        )
+    }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(
             selected = state.surface == NotesSurface.All,
@@ -1611,11 +1685,25 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
                 )
             }
         }
+        if (state.surface == NotesSurface.Folders && state.folderFilter != null) {
+            AssistChip(
+                onClick = { folderRenameTarget = state.folderFilter },
+                label = { Text("Rename folder") },
+                leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+        }
         state.tags.forEach { tag ->
             FilterChip(
                 selected = state.tagFilter == tag,
                 onClick = { viewModel.filterTag(tag) },
                 label = { Text("#$tag") },
+                leadingIcon = { Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+        }
+        if (state.surface == NotesSurface.Tags && state.tagFilter != null) {
+            AssistChip(
+                onClick = { tagRenameTarget = state.tagFilter },
+                label = { Text("Rename tag") },
                 leadingIcon = { Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(16.dp)) }
             )
         }

@@ -378,6 +378,15 @@ class NoteModelTest {
     }
 
     @Test
+    fun folderAndTagRenameHelpersUpdateMatchingOrganizationValues() {
+        assertEquals("Archive", renameFolderPath("Work", "Work", "Archive"))
+        assertEquals("Archive/Product", renameFolderPath("Work/Product", "Work", "Archive"))
+        assertEquals("Homework", renameFolderPath("Homework", "Work", "Archive"))
+        assertEquals(listOf("personal", "ideas"), renameTagList(listOf("work", "ideas", "personal"), "work", "personal"))
+        assertEquals(listOf("work", "ideas"), renameTagList(listOf("work", "ideas"), "work", "   "))
+    }
+
+    @Test
     fun widgetSummaryShowsLatestVisibleNoteWithoutLockedPreview() {
         val empty = notesWidgetSummary(emptyList())
         val normal = notesWidgetSummary(
