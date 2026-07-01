@@ -4,6 +4,8 @@
     <string name="shortcut_disabled">Shortcut disabled</string>
     <string name="shortcut_text_short">Text note</string>
     <string name="shortcut_text_long">Create or open a text note</string>
+    <string name="shortcut_checklist_short">Checklist</string>
+    <string name="shortcut_checklist_long">Create or open a checklist note</string>
     <string name="shortcut_draw_short">Handwriting</string>
     <string name="shortcut_draw_long">Create or open a handwriting note</string>
 </resources>

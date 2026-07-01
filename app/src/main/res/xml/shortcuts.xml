@@ -20,6 +20,22 @@
         android:enabled="true"
         android:icon="@drawable/ic_launcher_foreground"
         android:shortcutDisabledMessage="@string/shortcut_disabled"
+        android:shortcutId="quick_checklist_note"
+        android:shortcutLongLabel="@string/shortcut_checklist_long"
+        android:shortcutShortLabel="@string/shortcut_checklist_short">
+        <intent
+            android:action="com.example.snotes.action.QUICK_NOTE"
+            android:targetClass="com.example.snotes.MainActivity"
+            android:targetPackage="com.example.snotes">
+            <extra
+                android:name="com.example.snotes.extra.QUICK_NOTE_KIND"
+                android:value="Checklist" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutDisabledMessage="@string/shortcut_disabled"
         android:shortcutId="quick_handwriting_note"
         android:shortcutLongLabel="@string/shortcut_draw_long"
         android:shortcutShortLabel="@string/shortcut_draw_short">
