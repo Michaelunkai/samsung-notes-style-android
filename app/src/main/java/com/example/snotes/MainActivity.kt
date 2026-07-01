@@ -520,18 +520,18 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun createSharedImportNote(sharedText: String?, attachments: List<NoteBlock.Attachment>) {
-        val firstAttachment = attachments.firstOrNull()
+    fun createSharedImportNote(sharedText: String?, importedBlocks: List<NoteBlock>) {
+        val firstImportedName = importedBlocks.firstOrNull()?.importedName
         val title = sharedText
             ?.lineSequence()
             ?.firstOrNull()
             ?.take(48)
             ?.ifBlank { null }
-            ?: firstAttachment?.name?.take(48)
+            ?: firstImportedName?.take(48)
             ?: "Shared file"
         val blocks = buildList {
             if (!sharedText.isNullOrBlank()) add(NoteBlock.Text(text = sharedText))
-            addAll(attachments)
+            addAll(importedBlocks)
             if (isEmpty()) add(NoteBlock.Text())
         }
         createSharedNote(title = title, blocks = blocks)
@@ -1048,6 +1048,13 @@ fun NoteBlock.toPlainText(): String = when (this) {
     is NoteBlock.Audio -> "[Audio: $name${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
 }
 
+val NoteBlock.importedName: String?
+    get() = when (this) {
+        is NoteBlock.Attachment -> name
+        is NoteBlock.Audio -> name
+        else -> null
+    }
+
 fun String.sanitizeFileName(): String =
     replace(Regex("""[\\/:*?"<>|]+"""), "-")
         .trim()
@@ -1160,20 +1167,15 @@ fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = 
     LaunchedEffect(launchRequest.sequence) {
         val request = launchRequest.request
         if (request.sharedAttachments.isNotEmpty()) {
-            val attachments = request.sharedAttachments.map { shared ->
+            val importedBlocks = request.sharedAttachments.map { shared ->
                 val uri = Uri.parse(shared.uri)
                 runCatching {
                     context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 val metadata = queryAttachmentMetadata(context, uri)
-                NoteBlock.Attachment(
-                    uri = shared.uri,
-                    name = metadata.name,
-                    mimeHint = shared.mimeHint ?: metadata.mimeHint,
-                    sizeBytes = metadata.sizeBytes
-                )
+                metadata.copy(mimeHint = shared.mimeHint ?: metadata.mimeHint).toNoteBlock(shared.uri)
             }
-            viewModel.createSharedImportNote(request.sharedText, attachments)
+            viewModel.createSharedImportNote(request.sharedText, importedBlocks)
         } else {
             request.sharedText?.let { viewModel.createSharedTextNote(it) }
         }
@@ -1937,12 +1939,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
         val metadata = queryAttachmentMetadata(context, uri)
         viewModel.addBlock(
             note,
-            NoteBlock.Attachment(
-                uri = uri.toString(),
-                name = metadata.name,
-                mimeHint = metadata.mimeHint,
-                sizeBytes = metadata.sizeBytes
-            )
+            metadata.toNoteBlock(uri.toString())
         )
     }
     val noteExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
@@ -2852,6 +2849,18 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
 
 data class AttachmentMetadata(val name: String, val mimeHint: String, val sizeBytes: Long)
 
+fun AttachmentMetadata.toNoteBlock(uri: String): NoteBlock =
+    if (mimeHint.startsWith("audio/")) {
+        NoteBlock.Audio(path = uri, name = name)
+    } else {
+        NoteBlock.Attachment(
+            uri = uri,
+            name = name,
+            mimeHint = mimeHint,
+            sizeBytes = sizeBytes
+        )
+    }
+
 fun queryAttachmentMetadata(context: Context, uri: Uri): AttachmentMetadata {
     var name = uri.lastPathSegment?.substringAfterLast('/') ?: "Attachment"
     var size = 0L
@@ -2893,6 +2902,7 @@ fun formatBytes(sizeBytes: Long): String = when {
 
 @Composable
 fun AudioBlock(note: SNote, block: NoteBlock.Audio, viewModel: NotesViewModel) {
+    val context = LocalContext.current
     var playing by remember(block.path) { mutableStateOf(false) }
     val player = remember(block.path) { MediaPlayer() }
     DisposableEffect(block.path) {
@@ -2916,7 +2926,7 @@ fun AudioBlock(note: SNote, block: NoteBlock.Audio, viewModel: NotesViewModel) {
                     } else {
                         runCatching {
                             player.reset()
-                            player.setDataSource(block.path)
+                            player.setAudioSource(context, block.path)
                             player.setOnCompletionListener { playing = false }
                             player.prepare()
                             player.start()
@@ -2943,6 +2953,15 @@ fun AudioBlock(note: SNote, block: NoteBlock.Audio, viewModel: NotesViewModel) {
                 Icon(Icons.Default.Delete, "Delete audio")
             }
         }
+    }
+}
+
+fun MediaPlayer.setAudioSource(context: Context, path: String) {
+    val uri = Uri.parse(path)
+    if (uri.scheme == "content") {
+        setDataSource(context, uri)
+    } else {
+        setDataSource(path)
     }
 }
 

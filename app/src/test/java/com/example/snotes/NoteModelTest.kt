@@ -603,6 +603,18 @@ class NoteModelTest {
     }
 
     @Test
+    fun importedAudioMetadataCreatesPlayableAudioBlock() {
+        val audio = AttachmentMetadata("clip.m4a", "audio/mp4", 4096).toNoteBlock("content://example/audio")
+        val pdf = AttachmentMetadata("brief.pdf", "application/pdf", 4096).toNoteBlock("content://example/pdf")
+
+        assertTrue(audio is NoteBlock.Audio)
+        assertEquals("content://example/audio", (audio as NoteBlock.Audio).path)
+        assertEquals("clip.m4a", audio.name)
+        assertTrue(pdf is NoteBlock.Attachment)
+        assertEquals("brief.pdf", (pdf as NoteBlock.Attachment).name)
+    }
+
+    @Test
     fun audioDurationFormattingUsesMinuteSecondLabels() {
         assertEquals("", formatDuration(0))
         assertEquals("0:01", formatDuration(1_500))
