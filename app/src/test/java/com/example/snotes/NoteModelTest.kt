@@ -216,14 +216,17 @@ class NoteModelTest {
 
         val text = NewNoteKind.Text.createNoteWithDefaults(defaults)
         val checklist = NewNoteKind.Checklist.createNoteWithDefaults(defaults)
+        val sticky = NewNoteKind.Sticky.createNoteWithDefaults(defaults)
         val drawing = NewNoteKind.Drawing.createNoteWithDefaults(defaults)
 
         assertEquals(PageTemplate.Dotted, text.pageTemplate)
         assertEquals(0xFFEFF6FF, text.paperColor)
         assertTrue(text.blocks.single() is NoteBlock.Text)
         assertTrue(checklist.blocks.single() is NoteBlock.Checklist)
+        assertTrue(sticky.blocks.single() is NoteBlock.Sticky)
         assertTrue(drawing.blocks.single() is NoteBlock.Drawing)
         assertEquals(PageTemplate.Dotted, checklist.pageTemplate)
+        assertEquals(PageTemplate.Dotted, sticky.pageTemplate)
         assertEquals(0xFFEFF6FF, drawing.paperColor)
     }
 
@@ -282,6 +285,12 @@ class NoteModelTest {
             sharedText = null,
             quickKindName = "Drawing"
         )
+        val quickSticky = noteLaunchRequestFrom(
+            action = ACTION_QUICK_NOTE,
+            mimeType = null,
+            sharedText = null,
+            quickKindName = "Sticky"
+        )
         val openNote = noteLaunchRequestFrom(
             action = null,
             mimeType = null,
@@ -298,6 +307,7 @@ class NoteModelTest {
 
         assertEquals("Shared meeting note", shared.sharedText)
         assertEquals(NewNoteKind.Drawing, quickDraw.quickNoteKind)
+        assertEquals(NewNoteKind.Sticky, quickSticky.quickNoteKind)
         assertEquals("note-42", openNote.openNoteId)
         assertEquals(null, invalid.quickNoteKind)
     }

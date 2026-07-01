@@ -22,7 +22,7 @@ Native Android prototype for a Samsung Notes-style note-taking app.
 - JSON backup export/import plus per-note plain text export/share and PDF export.
 - Android share targets for incoming text, images, PDFs, generic files, and audio.
 - Home-screen widget provider with latest-note preview, latest-note open target, and quick text/checklist/handwriting actions.
-- Static launcher shortcuts for quick text, checklist, and handwriting notes.
+- Static launcher shortcuts for quick text, checklist, sticky, and handwriting notes.
 
 ## Important implementation notes
 

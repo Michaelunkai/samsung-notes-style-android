@@ -1129,6 +1129,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 enum class NewNoteKind(val title: String) {
     Text("New note"),
     Checklist("New checklist"),
+    Sticky("New sticky note"),
     Drawing("New sketch")
 }
 
@@ -1136,6 +1137,7 @@ fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()):
     val blocks = when (this) {
         NewNoteKind.Text -> listOf(NoteBlock.Text())
         NewNoteKind.Checklist -> listOf(NoteBlock.Checklist())
+        NewNoteKind.Sticky -> listOf(NoteBlock.Sticky())
         NewNoteKind.Drawing -> listOf(NoteBlock.Drawing())
     }
     return SNote(
@@ -1548,6 +1550,14 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 onClick = {
                                     createMenuOpen = false
                                     viewModel.createNote(NewNoteKind.Checklist)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Sticky note") },
+                                leadingIcon = { Icon(Icons.Default.Description, null) },
+                                onClick = {
+                                    createMenuOpen = false
+                                    viewModel.createNote(NewNoteKind.Sticky)
                                 }
                             )
                             DropdownMenuItem(
