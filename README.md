@@ -5,7 +5,7 @@ Native Android prototype for a Samsung Notes-style note-taking app.
 ## Implemented in this workspace
 
 - Kotlin Android project scaffold using Gradle Kotlin DSL and Jetpack Compose.
-- Notes home screen with list/grid modes, search scopes, folders, tags, favorites, pinned notes, trash, light/dark mode, and multi-select actions.
+- Notes home screen with list/grid modes, search scopes, contextual empty states, folders, tags, favorites, pinned notes, trash, light/dark mode, and multi-select actions.
 - Folder and tag organization with filters, bulk move/tag actions, and rename actions for selected folders and tags.
 - Editor screen with auto-persisted title, folder, tag, template, paper color, mixed block changes, and capped note-level undo/redo.
 - In-note search panel with match counts, snippets, previous/next navigation, active-match scrolling, and highlighted matched blocks.

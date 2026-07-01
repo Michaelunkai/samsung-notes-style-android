@@ -354,6 +354,12 @@ data class EditorSearchMatch(
     val snippet: String
 )
 
+data class EmptyNotesCopy(
+    val title: String,
+    val subtitle: String,
+    val actionLabel: String? = null
+)
+
 data class DrawPoint(val x: Float, val y: Float)
 
 data class DrawStroke(
@@ -584,6 +590,37 @@ enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
 enum class NoteViewMode(val label: String) {
     List("List"),
     Grid("Grid")
+}
+
+fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
+    search.isNotBlank() -> EmptyNotesCopy(
+        title = "No matching notes",
+        subtitle = "Try a different search term or search scope."
+    )
+    surface == NotesSurface.Trash -> EmptyNotesCopy(
+        title = "Trash is empty",
+        subtitle = "Deleted notes will stay here until you remove them permanently."
+    )
+    surface == NotesSurface.Favorites -> EmptyNotesCopy(
+        title = "No favorites yet",
+        subtitle = "Favorite important notes to find them here quickly.",
+        actionLabel = "Create note"
+    )
+    surface == NotesSurface.Folders && folderFilter != null -> EmptyNotesCopy(
+        title = "No notes in $folderFilter",
+        subtitle = "Move notes into this folder or create a new note.",
+        actionLabel = "Create note"
+    )
+    surface == NotesSurface.Tags && tagFilter != null -> EmptyNotesCopy(
+        title = "No notes tagged #$tagFilter",
+        subtitle = "Add this tag to a note or start a new one.",
+        actionLabel = "Create note"
+    )
+    else -> EmptyNotesCopy(
+        title = "No notes yet",
+        subtitle = "Create a text note, checklist, handwriting page, or imported note.",
+        actionLabel = "Create note"
+    )
 }
 
 class NotesViewModel(application: Application) : AndroidViewModel(application) {
@@ -1627,7 +1664,12 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                 SelectionActionBar(state, viewModel)
                 Spacer(Modifier.height(8.dp))
             }
-            if (state.viewMode == NoteViewMode.Grid) {
+            if (state.visibleNotes.isEmpty()) {
+                EmptyNotesState(
+                    copy = state.emptyNotesCopy(),
+                    onCreateNote = { viewModel.createNote(NewNoteKind.Text) }
+                )
+            } else if (state.viewMode == NoteViewMode.Grid) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 170.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1720,6 +1762,38 @@ fun SearchScopeChips(state: NotesUiState, viewModel: NotesViewModel) {
                 onClick = { viewModel.setSearchScope(scope) },
                 label = { Text(scope.label) }
             )
+        }
+    }
+}
+
+@Composable
+fun EmptyNotesState(copy: EmptyNotesCopy, onCreateNote: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp, horizontal = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(
+            Icons.Default.Description,
+            contentDescription = null,
+            modifier = Modifier.size(42.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(copy.title, style = MaterialTheme.typography.titleMedium)
+        Text(
+            copy.subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        copy.actionLabel?.let { label ->
+            Button(onClick = onCreateNote) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text(label)
+            }
         }
     }
 }

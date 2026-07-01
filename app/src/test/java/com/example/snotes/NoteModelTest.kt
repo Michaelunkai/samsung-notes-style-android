@@ -103,6 +103,22 @@ class NoteModelTest {
     }
 
     @Test
+    fun emptyNotesCopyExplainsCurrentHomeSurface() {
+        assertEquals("No matching notes", NotesUiState(search = "missing").emptyNotesCopy().title)
+        assertEquals("Trash is empty", NotesUiState(surface = NotesSurface.Trash).emptyNotesCopy().title)
+        assertEquals("No favorites yet", NotesUiState(surface = NotesSurface.Favorites).emptyNotesCopy().title)
+        assertEquals(
+            "No notes in Work",
+            NotesUiState(surface = NotesSurface.Folders, folderFilter = "Work").emptyNotesCopy().title
+        )
+        assertEquals(
+            "No notes tagged #project",
+            NotesUiState(surface = NotesSurface.Tags, tagFilter = "project").emptyNotesCopy().title
+        )
+        assertEquals("Create note", NotesUiState().emptyNotesCopy().actionLabel)
+    }
+
+    @Test
     fun searchScopesMatchContentMetadataAndAttachments() {
         val note = SNote(
             title = "Launch plan",
