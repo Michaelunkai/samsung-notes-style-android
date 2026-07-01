@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DarkMode
@@ -307,6 +308,12 @@ data class NoteDetails(
 )
 
 data class SearchMatch(val scope: SearchScope, val label: String)
+
+data class EditorSearchMatch(
+    val blockId: String?,
+    val label: String,
+    val snippet: String
+)
 
 data class DrawPoint(val x: Float, val y: Float)
 
@@ -1949,6 +1956,13 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var pendingNoteExportText by remember { mutableStateOf("") }
     var pendingPdfExportNote by remember { mutableStateOf<SNote?>(null) }
     var detailsOpen by remember { mutableStateOf(false) }
+    var editorSearchOpen by remember { mutableStateOf(false) }
+    var editorSearchQuery by remember(note.id) { mutableStateOf("") }
+    var activeSearchMatch by remember(note.id) { mutableStateOf(0) }
+    val editorSearchMatches = remember(note, editorSearchQuery) { note.editorSearchMatches(editorSearchQuery) }
+    LaunchedEffect(editorSearchQuery, editorSearchMatches.size) {
+        activeSearchMatch = activeSearchMatch.coerceIn(0, (editorSearchMatches.size - 1).coerceAtLeast(0))
+    }
     DisposableEffect(audioRecorder) {
         onDispose {
             audioRecorder.stop()
@@ -2008,6 +2022,9 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { editorSearchOpen = !editorSearchOpen }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search in note")
+                    }
                     IconButton(onClick = { detailsOpen = true }) {
                         Icon(Icons.Default.Info, contentDescription = "Note details")
                     }
@@ -2095,6 +2112,35 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
         ) {
             item {
                 NoteMetaEditor(note, state, viewModel)
+            }
+            if (editorSearchOpen) {
+                item {
+                    NoteSearchPanel(
+                        query = editorSearchQuery,
+                        matches = editorSearchMatches,
+                        activeMatchIndex = activeSearchMatch,
+                        onQueryChange = {
+                            editorSearchQuery = it
+                            activeSearchMatch = 0
+                        },
+                        onPrevious = {
+                            if (editorSearchMatches.isNotEmpty()) {
+                                activeSearchMatch =
+                                    (activeSearchMatch - 1 + editorSearchMatches.size) % editorSearchMatches.size
+                            }
+                        },
+                        onNext = {
+                            if (editorSearchMatches.isNotEmpty()) {
+                                activeSearchMatch = (activeSearchMatch + 1) % editorSearchMatches.size
+                            }
+                        },
+                        onClose = {
+                            editorSearchOpen = false
+                            editorSearchQuery = ""
+                            activeSearchMatch = 0
+                        }
+                    )
+                }
             }
             itemsIndexed(note.blocks, key = { _, block -> block.id }) { index, block ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -2308,6 +2354,68 @@ fun DetailRow(label: String, value: String) {
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.End
         )
+    }
+}
+
+@Composable
+fun NoteSearchPanel(
+    query: String,
+    matches: List<EditorSearchMatch>,
+    activeMatchIndex: Int,
+    onQueryChange: (String) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit
+) {
+    val activeMatch = matches.getOrNull(activeMatchIndex)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    modifier = Modifier.weight(1f),
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    label = { Text("Find in note") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                )
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Default.Close, contentDescription = "Close note search")
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    when {
+                        query.isBlank() -> "Enter text to search this note"
+                        matches.isEmpty() -> "No matches"
+                        else -> "${activeMatchIndex + 1} of ${matches.size}"
+                    },
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                IconButton(enabled = matches.isNotEmpty(), onClick = onPrevious) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Previous note match")
+                }
+                IconButton(enabled = matches.isNotEmpty(), onClick = onNext) {
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Next note match")
+                }
+            }
+            if (activeMatch != null) {
+                Text(activeMatch.label, style = MaterialTheme.typography.labelLarge)
+                Text(
+                    activeMatch.snippet,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
@@ -3084,6 +3192,47 @@ fun SNote.searchMatches(query: String, scope: SearchScope = SearchScope.All): Li
 
 fun SearchScope.includes(candidate: SearchScope): Boolean =
     this == SearchScope.All || this == candidate
+
+fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
+    val normalized = query.trim()
+    if (normalized.isBlank()) return emptyList()
+    return buildList {
+        if (title.contains(normalized, ignoreCase = true)) {
+            add(EditorSearchMatch(null, "Title", title.searchSnippet(normalized)))
+        }
+        if (folder.contains(normalized, ignoreCase = true)) {
+            add(EditorSearchMatch(null, "Folder", folder.searchSnippet(normalized)))
+        }
+        tags.filter { it.contains(normalized, ignoreCase = true) }
+            .forEach { tag -> add(EditorSearchMatch(null, "Tag", "#${tag.searchSnippet(normalized)}")) }
+        blocks.forEach { block ->
+            when (block) {
+                is NoteBlock.Text -> if (block.text.contains(normalized, ignoreCase = true)) {
+                    add(EditorSearchMatch(block.id, "Text block", block.text.searchSnippet(normalized)))
+                }
+                is NoteBlock.Checklist -> block.items
+                    .filter { it.text.contains(normalized, ignoreCase = true) }
+                    .forEach { item ->
+                        val status = if (item.checked) "done" else "open"
+                        add(EditorSearchMatch(block.id, "Checklist item ($status)", item.text.searchSnippet(normalized)))
+                    }
+                is NoteBlock.Attachment -> if (
+                    block.name.contains(normalized, ignoreCase = true) ||
+                    block.mimeHint.contains(normalized, ignoreCase = true)
+                ) {
+                    add(EditorSearchMatch(block.id, "Attachment", block.name.searchSnippet(normalized)))
+                }
+                is NoteBlock.Audio -> if (
+                    block.name.contains(normalized, ignoreCase = true) ||
+                    block.path.contains(normalized, ignoreCase = true)
+                ) {
+                    add(EditorSearchMatch(block.id, "Audio", block.name.searchSnippet(normalized)))
+                }
+                is NoteBlock.Drawing -> Unit
+            }
+        }
+    }
+}
 
 fun NoteBlock.contentSearchLabels(query: String): List<String> = when (this) {
     is NoteBlock.Text -> if (text.contains(query, ignoreCase = true)) listOf("Text: ${text.searchSnippet(query)}") else emptyList()

@@ -122,6 +122,40 @@ class NoteModelTest {
     }
 
     @Test
+    fun editorSearchMatchesCurrentNoteContentInReadingOrder() {
+        val note = SNote(
+            title = "Launch plan",
+            folder = "Work/Launch",
+            tags = listOf("launch", "team"),
+            blocks = listOf(
+                NoteBlock.Text(id = "text", text = "Discuss launch readiness"),
+                NoteBlock.Checklist(
+                    id = "checklist",
+                    items = listOf(
+                        CheckItem(text = "Collect launch assets", checked = false),
+                        CheckItem(text = "Approve budget", checked = true)
+                    )
+                ),
+                NoteBlock.Attachment(id = "file", uri = "content://example/file", name = "launch-deck.pdf"),
+                NoteBlock.Audio(id = "audio", path = "/audio/launch-briefing.m4a", name = "launch-briefing.m4a")
+            )
+        )
+
+        val matches = note.editorSearchMatches("launch")
+
+        assertEquals(
+            listOf(null, null, null, "text", "checklist", "file", "audio"),
+            matches.map { it.blockId }
+        )
+        assertEquals("Title", matches[0].label)
+        assertEquals("Folder", matches[1].label)
+        assertEquals("Tag", matches[2].label)
+        assertEquals("Checklist item (open)", matches[4].label)
+        assertTrue(matches.all { it.snippet.contains("launch", ignoreCase = true) })
+        assertTrue(note.editorSearchMatches("   ").isEmpty())
+    }
+
+    @Test
     fun newNoteKindsUseConfiguredDefaults() {
         val defaults = NoteDefaults(pageTemplate = PageTemplate.Dotted, paperColor = 0xFFEFF6FF)
 

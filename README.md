@@ -8,6 +8,7 @@ Native Android prototype for a Samsung Notes-style note-taking app.
 - Notes home screen with list/grid modes, search scopes, folders, tags, favorites, pinned notes, trash, light/dark mode, and multi-select actions.
 - Folder and tag organization with filters, bulk move/tag actions, and rename actions for selected folders and tags.
 - Editor screen with auto-persisted title, folder, tag, template, paper color, and mixed block changes.
+- In-note search panel with match counts, snippets, and previous/next navigation.
 - Rich text block controls for bold, italic, underline, text color, highlight color, size presets, and alignment.
 - Checklist blocks with add, edit, complete all, uncheck all, clear done, item reorder, and delete item actions.
 - Handwriting/drawing blocks with pen, fountain pen, highlighter, eraser, stroke width, color palette, undo, clear, vector JSON persistence, and segment-preserving erasing.
