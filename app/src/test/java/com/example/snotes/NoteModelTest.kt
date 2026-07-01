@@ -23,6 +23,7 @@ class NoteModelTest {
                     italic = true,
                     underline = true,
                     color = 0xFF1D4ED8,
+                    fontFamily = NoteFontFamily.Serif,
                     alignment = TextAlignment.Center
                 ),
                 NoteBlock.Checklist(
@@ -60,6 +61,7 @@ class NoteModelTest {
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
         assertTrue((restored.blocks[0] as NoteBlock.Text).bold)
         assertTrue((restored.blocks[0] as NoteBlock.Text).underline)
+        assertEquals(NoteFontFamily.Serif, (restored.blocks[0] as NoteBlock.Text).fontFamily)
         assertEquals(TextAlignment.Center, (restored.blocks[0] as NoteBlock.Text).alignment)
         assertEquals("Ship debug build", (restored.blocks[1] as NoteBlock.Checklist).items[0].text)
         assertTrue((restored.blocks[1] as NoteBlock.Checklist).items[0].checked)
@@ -406,6 +408,8 @@ class NoteModelTest {
     fun textAlignmentParserFallsBackForLegacyBlocks() {
         assertEquals(TextAlignment.End, "End".toTextAlignment(TextAlignment.Start))
         assertEquals(TextAlignment.Start, "legacy".toTextAlignment(TextAlignment.Start))
+        assertEquals(NoteFontFamily.Mono, "Mono".toNoteFontFamily(NoteFontFamily.Default))
+        assertEquals(NoteFontFamily.Default, "legacy".toNoteFontFamily(NoteFontFamily.Default))
     }
 
     @Test

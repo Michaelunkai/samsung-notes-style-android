@@ -144,6 +144,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -254,6 +255,7 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         val color: Long = 0xFF2B2A27,
         val highlight: Long = 0x00FFFFFF,
         val sizeSp: Int = 18,
+        val fontFamily: NoteFontFamily = NoteFontFamily.Default,
         val alignment: TextAlignment = TextAlignment.Start
     ) : NoteBlock(id, "Text")
 
@@ -338,10 +340,26 @@ enum class TextAlignment(val label: String) {
     End("Right")
 }
 
+enum class NoteFontFamily(val label: String) {
+    Default("Default"),
+    Sans("Sans"),
+    Serif("Serif"),
+    Mono("Mono"),
+    Cursive("Cursive")
+}
+
 fun TextAlignment.toComposeTextAlign(): TextAlign = when (this) {
     TextAlignment.Start -> TextAlign.Start
     TextAlignment.Center -> TextAlign.Center
     TextAlignment.End -> TextAlign.End
+}
+
+fun NoteFontFamily.toComposeFontFamily(): FontFamily? = when (this) {
+    NoteFontFamily.Default -> null
+    NoteFontFamily.Sans -> FontFamily.SansSerif
+    NoteFontFamily.Serif -> FontFamily.Serif
+    NoteFontFamily.Mono -> FontFamily.Monospace
+    NoteFontFamily.Cursive -> FontFamily.Cursive
 }
 
 enum class PageTemplate(val label: String) {
@@ -2507,6 +2525,7 @@ fun EditorToolbar(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewModel) {
     var colorMenuOpen by remember { mutableStateOf(false) }
@@ -2516,6 +2535,7 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
         fontSize = block.sizeSp.sp,
         fontWeight = if (block.bold) FontWeight.Bold else FontWeight.Normal,
         fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal,
+        fontFamily = block.fontFamily.toComposeFontFamily(),
         textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None,
         textAlign = block.alignment.toComposeTextAlign()
     )
@@ -2603,6 +2623,15 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                         selected = block.sizeSp == size,
                         onClick = { viewModel.updateBlock(note, block.copy(sizeSp = size)) },
                         label = { Text("${size}sp") }
+                    )
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                NoteFontFamily.entries.forEach { fontFamily ->
+                    FilterChip(
+                        selected = block.fontFamily == fontFamily,
+                        onClick = { viewModel.updateBlock(note, block.copy(fontFamily = fontFamily)) },
+                        label = { Text(fontFamily.label) }
                     )
                 }
             }
@@ -3377,6 +3406,7 @@ fun NoteBlock.toJson(): JSONObject {
             .put("color", color)
             .put("highlight", highlight)
             .put("sizeSp", sizeSp)
+            .put("fontFamily", fontFamily.name)
             .put("alignment", alignment.name)
 
         is NoteBlock.Checklist -> json
@@ -3495,6 +3525,7 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         color = optLong("color", 0xFF2B2A27),
         highlight = optLong("highlight", 0x00FFFFFF),
         sizeSp = optInt("sizeSp", 18),
+        fontFamily = optString("fontFamily").toNoteFontFamily(NoteFontFamily.Default),
         alignment = optString("alignment").toTextAlignment(TextAlignment.Start)
     )
 }
@@ -3538,6 +3569,9 @@ fun String.toDrawTool(default: DrawTool): DrawTool =
 
 fun String.toTextAlignment(default: TextAlignment): TextAlignment =
     TextAlignment.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
+
+fun String.toNoteFontFamily(default: NoteFontFamily): NoteFontFamily =
+    NoteFontFamily.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
 
 fun String.toPageTemplate(default: PageTemplate): PageTemplate =
     PageTemplate.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
