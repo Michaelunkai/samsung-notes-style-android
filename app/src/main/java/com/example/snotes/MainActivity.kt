@@ -227,6 +227,11 @@ data class CheckItem(
     val checked: Boolean = false
 )
 
+data class ChecklistProgress(val done: Int, val total: Int) {
+    val label: String
+        get() = "$done/$total done"
+}
+
 data class DrawPoint(val x: Float, val y: Float)
 
 data class DrawStroke(
@@ -1348,12 +1353,15 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
 
 @Composable
 fun ChecklistBlockEditor(note: SNote, block: NoteBlock.Checklist, viewModel: NotesViewModel) {
+    val progress = block.progress()
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CheckBox, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Checklist", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                Text(progress.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(8.dp))
                 IconButton(onClick = {
                     viewModel.updateBlock(note, block.copy(items = block.items + CheckItem(text = "")))
                 }) { Icon(Icons.Default.Add, "Add item") }
@@ -1361,7 +1369,21 @@ fun ChecklistBlockEditor(note: SNote, block: NoteBlock.Checklist, viewModel: Not
                     Icon(Icons.Default.Delete, "Delete checklist")
                 }
             }
-            block.items.forEach { item ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { viewModel.updateBlock(note, block.setAllChecked(true)) }) {
+                    Text("Complete all")
+                }
+                TextButton(onClick = { viewModel.updateBlock(note, block.setAllChecked(false)) }) {
+                    Text("Uncheck all")
+                }
+                TextButton(
+                    enabled = block.items.any { it.checked },
+                    onClick = { viewModel.updateBlock(note, block.clearCompleted()) }
+                ) {
+                    Text("Clear done")
+                }
+            }
+            block.items.forEachIndexed { index, item ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = item.checked,
@@ -1372,6 +1394,22 @@ fun ChecklistBlockEditor(note: SNote, block: NoteBlock.Checklist, viewModel: Not
                             )
                         }
                     )
+                    Column {
+                        IconButton(
+                            enabled = index > 0,
+                            onClick = { viewModel.updateBlock(note, block.moveItem(item.id, -1)) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text("↑")
+                        }
+                        IconButton(
+                            enabled = index < block.items.lastIndex,
+                            onClick = { viewModel.updateBlock(note, block.moveItem(item.id, 1)) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text("↓")
+                        }
+                    }
                     BasicTextField(
                         value = item.text,
                         onValueChange = { text ->
@@ -1381,7 +1419,8 @@ fun ChecklistBlockEditor(note: SNote, block: NoteBlock.Checklist, viewModel: Not
                             )
                         },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (item.checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None
                         ),
                         modifier = Modifier
                             .weight(1f)
@@ -1759,6 +1798,25 @@ fun formatDuration(durationMs: Long): String {
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
 }
+
+fun NoteBlock.Checklist.progress(): ChecklistProgress =
+    ChecklistProgress(done = items.count { it.checked }, total = items.size)
+
+fun NoteBlock.Checklist.moveItem(itemId: String, direction: Int): NoteBlock.Checklist {
+    val index = items.indexOfFirst { it.id == itemId }
+    val target = index + direction
+    if (index !in items.indices || target !in items.indices) return this
+    val updated = items.toMutableList()
+    val item = updated.removeAt(index)
+    updated.add(target, item)
+    return copy(items = updated)
+}
+
+fun NoteBlock.Checklist.clearCompleted(): NoteBlock.Checklist =
+    copy(items = items.filterNot { it.checked }.ifEmpty { listOf(CheckItem(text = "")) })
+
+fun NoteBlock.Checklist.setAllChecked(checked: Boolean): NoteBlock.Checklist =
+    copy(items = items.map { it.copy(checked = checked) })
 
 class AudioRecorder(private val context: Context) {
     private var recorder: MediaRecorder? = null

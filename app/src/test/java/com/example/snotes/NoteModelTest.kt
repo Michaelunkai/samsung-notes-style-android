@@ -243,4 +243,22 @@ class NoteModelTest {
         assertEquals("1:05", formatDuration(65_000))
         assertEquals("10:00", formatDuration(600_000))
     }
+
+    @Test
+    fun checklistHelpersTrackProgressReorderAndClearCompleted() {
+        val first = CheckItem(id = "first", text = "First", checked = false)
+        val second = CheckItem(id = "second", text = "Second", checked = true)
+        val third = CheckItem(id = "third", text = "Third", checked = false)
+        val checklist = NoteBlock.Checklist(items = listOf(first, second, third))
+
+        assertEquals(ChecklistProgress(done = 1, total = 3), checklist.progress())
+        assertEquals(listOf("second", "first", "third"), checklist.moveItem("second", -1).items.map { it.id })
+        assertEquals(listOf("first", "third"), checklist.clearCompleted().items.map { it.id })
+        assertTrue(checklist.setAllChecked(true).items.all { it.checked })
+        assertTrue(checklist.setAllChecked(true).setAllChecked(false).items.none { it.checked })
+
+        val onlyDone = NoteBlock.Checklist(items = listOf(CheckItem(text = "Done", checked = true)))
+        assertEquals(1, onlyDone.clearCompleted().items.size)
+        assertEquals("", onlyDone.clearCompleted().items.single().text)
+    }
 }
