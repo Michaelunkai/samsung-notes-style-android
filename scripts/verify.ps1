@@ -34,8 +34,15 @@ $env:Path = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$gradleHome\bin
 
 Push-Location -LiteralPath $root
 try {
-    & $gradle --console=plain --stop | Out-Null
-    & $gradle --console=plain clean :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+    & $gradle `
+        --console=plain `
+        --no-daemon `
+        --max-workers=2 `
+        '-Dkotlin.compiler.execution.strategy=in-process' `
+        clean `
+        :app:assembleDebug `
+        :app:testDebugUnitTest `
+        :app:lintDebug
     if ($LASTEXITCODE -ne 0) {
         throw "Gradle verification failed with exit code $LASTEXITCODE."
     }
