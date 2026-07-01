@@ -238,6 +238,7 @@ data class NotesUiState(
     val surface: NotesSurface = NotesSurface.All,
     val sortMode: NoteSortMode = NoteSortMode.ModifiedNewest,
     val viewMode: NoteViewMode = NoteViewMode.List,
+    val statusMessage: String? = null,
     val darkMode: Boolean = false
 ) {
     val visibleNotes: List<SNote>
@@ -432,6 +433,31 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
+    fun exportBackupText(): String = notesToBackupJson(_state.value.notes)
+
+    fun restoreBackupText(rawBackup: String) {
+        val imported = notesFromBackupJson(rawBackup)
+        if (imported.isEmpty()) {
+            _state.update { it.copy(statusMessage = "No notes found in backup") }
+            return
+        }
+        _state.update { state ->
+            val importedIds = imported.map { it.id }.toSet()
+            val merged = (imported + state.notes.filterNot { it.id in importedIds })
+                .sortedWith(NoteSortMode.ModifiedNewest.comparator)
+            state.copy(
+                notes = merged,
+                selectedNoteId = imported.firstOrNull()?.id,
+                statusMessage = "Imported ${imported.size} notes"
+            )
+        }
+        persist()
+    }
+
+    fun setStatus(message: String?) {
+        _state.update { it.copy(statusMessage = message) }
+    }
+
     fun addBlock(note: SNote, block: NoteBlock) {
         updateNote(note.copy(blocks = note.blocks + block))
     }
@@ -540,8 +566,34 @@ fun NotesApp(viewModel: NotesViewModel, initialSharedText: String? = null) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
+    val context = LocalContext.current
     var createMenuOpen by remember { mutableStateOf(false) }
     var sortMenuOpen by remember { mutableStateOf(false) }
+    var pendingBackupText by remember { mutableStateOf("") }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                writer.write(pendingBackupText)
+            } ?: error("Unable to open backup destination")
+        }.onSuccess {
+            viewModel.setStatus("Backup exported")
+        }.onFailure {
+            viewModel.setStatus("Backup export failed")
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                reader.readText()
+            } ?: error("Unable to open backup file")
+        }.onSuccess { rawBackup ->
+            viewModel.restoreBackupText(rawBackup)
+        }.onFailure {
+            viewModel.setStatus("Backup import failed")
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -578,6 +630,23 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                     }
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("Export backup") },
+                                leadingIcon = { Icon(Icons.Default.AttachFile, null) },
+                                onClick = {
+                                    sortMenuOpen = false
+                                    pendingBackupText = viewModel.exportBackupText()
+                                    exportLauncher.launch("snotes-backup-${System.currentTimeMillis()}.json")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Import backup") },
+                                leadingIcon = { Icon(Icons.Default.Description, null) },
+                                onClick = {
+                                    sortMenuOpen = false
+                                    importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                                }
+                            )
                         }
                     }
                     Box {
@@ -671,6 +740,14 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                 singleLine = true
             )
             Spacer(Modifier.height(12.dp))
+            state.statusMessage?.let { message ->
+                AssistChip(
+                    onClick = { viewModel.setStatus(null) },
+                    label = { Text(message) },
+                    leadingIcon = { Icon(Icons.Default.CheckBox, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             FilterRail(state, viewModel)
             Spacer(Modifier.height(12.dp))
             Text(
@@ -1451,6 +1528,29 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("deleted", deleted)
     .put("createdAt", createdAt)
     .put("updatedAt", updatedAt)
+
+fun notesToBackupJson(notes: List<SNote>): String = JSONObject()
+    .put("schemaVersion", 1)
+    .put("exportedAt", System.currentTimeMillis())
+    .put("notes", JSONArray().also { array -> notes.forEach { array.put(it.toBackupJson()) } })
+    .toString(2)
+
+fun notesFromBackupJson(rawBackup: String): List<SNote> = runCatching {
+    val trimmed = rawBackup.trim()
+    val notesArray = if (trimmed.startsWith("[")) {
+        JSONArray(trimmed)
+    } else {
+        JSONObject(trimmed).optJSONArray("notes") ?: JSONArray()
+    }
+    notesArray.toNotes()
+}.getOrDefault(emptyList())
+
+fun JSONArray.toNotes(): List<SNote> = buildList {
+    for (i in 0 until length()) {
+        val noteJson = optJSONObject(i) ?: continue
+        add(noteJson.toNote())
+    }
+}
 
 fun NoteBlock.toJson(): JSONObject {
     val json = JSONObject().put("id", id)

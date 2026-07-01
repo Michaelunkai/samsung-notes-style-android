@@ -169,4 +169,23 @@ class NoteModelTest {
 
         assertEquals(listOf(far), remaining)
     }
+
+    @Test
+    fun backupJsonSupportsWrappedAndLegacyNoteArrays() {
+        val notes = listOf(
+            SNote(title = "Backup one", folder = "Work", tags = listOf("backup")),
+            SNote(title = "Backup two", folder = "Personal", favorite = true)
+        )
+
+        val wrapped = notesFromBackupJson(notesToBackupJson(notes))
+        assertEquals(listOf("Backup two", "Backup one"), wrapped.map { it.title }.sortedDescending())
+        assertTrue(wrapped.first { it.title == "Backup two" }.favorite)
+
+        val legacyArray = org.json.JSONArray().also { array ->
+            notes.forEach { array.put(it.toJson()) }
+        }.toString()
+        val legacy = notesFromBackupJson(legacyArray)
+        assertEquals(2, legacy.size)
+        assertEquals("Work", legacy.first { it.title == "Backup one" }.folder)
+    }
 }
