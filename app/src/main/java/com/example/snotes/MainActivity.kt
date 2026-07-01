@@ -315,6 +315,18 @@ fun noteDefaultsFromStoredValues(templateName: String?, paperColor: Long): NoteD
         paperColor = paperColor.takeIf { it in DEFAULT_PAPER_COLORS } ?: DEFAULT_PAPER_COLORS.first()
     )
 
+fun normalizeFolder(folder: String): String =
+    folder.trim().replace(Regex("""[/\\]+"""), "/").trim('/').ifBlank { "All notes" }
+
+fun parseTagInput(tags: String): List<String> =
+    tags.split(",")
+        .map { it.trim().removePrefix("#") }
+        .filter { it.isNotBlank() }
+        .distinct()
+
+fun mergeTags(existing: List<String>, added: String): List<String> =
+    (existing + parseTagInput(added)).distinct()
+
 fun SharedPreferences.loadNoteDefaults(): NoteDefaults =
     noteDefaultsFromStoredValues(
         templateName = getString(SETTING_DEFAULT_PAGE_TEMPLATE, PageTemplate.Plain.name),
@@ -582,16 +594,13 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateFolder(note: SNote, folder: String) {
-        updateNote(note.copy(folder = folder.ifBlank { "All notes" }))
+        updateNote(note.copy(folder = normalizeFolder(folder)))
     }
 
     fun updateTags(note: SNote, tags: String) {
         updateNote(
             note.copy(
-                tags = tags.split(",")
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .distinct()
+                tags = parseTagInput(tags)
             )
         )
     }
@@ -683,7 +692,24 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun batchLockSelected(locked: Boolean) {
+        if (locked && !_state.value.hasNotePin) {
+            _state.update { it.copy(statusMessage = "Set a Notes PIN in Settings first") }
+            return
+        }
         updateSelectedNotes { it.copy(locked = locked) }
+    }
+
+    fun batchMoveSelectedToFolder(folder: String) {
+        updateSelectedNotes { it.copy(folder = normalizeFolder(folder)) }
+    }
+
+    fun batchAddTagsSelected(tags: String) {
+        val parsed = parseTagInput(tags)
+        if (parsed.isEmpty()) {
+            _state.update { it.copy(statusMessage = "Enter at least one tag") }
+            return
+        }
+        updateSelectedNotes { it.copy(tags = mergeTags(it.tags, tags)) }
     }
 
     fun batchMoveSelectedToTrash() {
@@ -1279,6 +1305,32 @@ fun SearchScopeChips(state: NotesUiState, viewModel: NotesViewModel) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
+    var moveDialogOpen by remember { mutableStateOf(false) }
+    var tagDialogOpen by remember { mutableStateOf(false) }
+    if (moveDialogOpen) {
+        BatchTextActionDialog(
+            title = "Move to folder",
+            label = "Folder",
+            confirmText = "Move",
+            onConfirm = {
+                viewModel.batchMoveSelectedToFolder(it)
+                moveDialogOpen = false
+            },
+            onDismiss = { moveDialogOpen = false }
+        )
+    }
+    if (tagDialogOpen) {
+        BatchTextActionDialog(
+            title = "Add tags",
+            label = "Tags",
+            confirmText = "Add",
+            onConfirm = {
+                viewModel.batchAddTagsSelected(it)
+                tagDialogOpen = false
+            },
+            onDismiss = { tagDialogOpen = false }
+        )
+    }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (state.surface == NotesSurface.Trash) {
             Button(onClick = viewModel::batchRestoreSelected) {
@@ -1288,6 +1340,12 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
                 Text("Delete")
             }
         } else {
+            Button(onClick = { moveDialogOpen = true }) {
+                Text("Move")
+            }
+            Button(onClick = { tagDialogOpen = true }) {
+                Text("Tag")
+            }
             Button(onClick = { viewModel.batchPinSelected(true) }) {
                 Text("Pin")
             }
@@ -1305,6 +1363,40 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
             Text("Cancel")
         }
     }
+}
+
+@Composable
+fun BatchTextActionDialog(
+    title: String,
+    label: String,
+    confirmText: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var value by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = value,
+                onValueChange = { value = it },
+                label = { Text(label) },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }) {
+                Text(confirmText)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

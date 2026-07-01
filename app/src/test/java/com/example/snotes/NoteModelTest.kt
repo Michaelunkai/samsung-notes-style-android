@@ -279,6 +279,14 @@ class NoteModelTest {
     }
 
     @Test
+    fun folderAndTagHelpersNormalizeOrganizationInput() {
+        assertEquals("All notes", normalizeFolder("   "))
+        assertEquals("Work/Product", normalizeFolder(" /Work//Product/ "))
+        assertEquals(listOf("work", "meeting"), parseTagInput(" #work, meeting, work, "))
+        assertEquals(listOf("existing", "work", "meeting"), mergeTags(listOf("existing", "work"), "#work, meeting"))
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",
