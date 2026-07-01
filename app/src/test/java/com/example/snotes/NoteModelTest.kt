@@ -472,6 +472,29 @@ class NoteModelTest {
     }
 
     @Test
+    fun noteListCanDuplicateSelectedNotesAtTopWithFreshNestedIds() {
+        val notes = listOf(
+            SNote(
+                id = "first",
+                title = "Template",
+                blocks = listOf(NoteBlock.Checklist(id = "list", items = listOf(CheckItem(id = "item", text = "Task"))))
+            ),
+            SNote(id = "second", title = "Keep")
+        )
+
+        val updated = notes.duplicateByIds(setOf("first"), now = 100)
+        val duplicate = updated.first()
+
+        assertEquals(listOf(duplicate.id, "first", "second"), updated.map { it.id })
+        assertEquals("Copy of Template", duplicate.title)
+        assertEquals(100, duplicate.createdAt)
+        assertEquals(100, duplicate.updatedAt)
+        assertTrue(duplicate.id != "first")
+        assertTrue((duplicate.blocks.single() as NoteBlock.Checklist).items.single().id != "item")
+        assertEquals(notes, notes.duplicateByIds(emptySet(), now = 100))
+    }
+
+    @Test
     fun notePlainTextExportIncludesMixedContent() {
         val note = SNote(
             title = "Sprint review",

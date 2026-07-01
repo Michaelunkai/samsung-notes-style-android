@@ -869,6 +869,25 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
+    fun batchDuplicateSelected() {
+        _state.update { state ->
+            val selected = state.selectedNotes
+            if (selected.isEmpty()) {
+                state.copy(statusMessage = "No notes selected")
+            } else {
+                val now = System.currentTimeMillis()
+                val duplicates = state.notes.duplicatedNotesByIds(state.selectedNoteIds, now)
+                state.copy(
+                    notes = duplicates + state.notes,
+                    selectedNoteId = duplicates.firstOrNull()?.id,
+                    selectedNoteIds = emptySet(),
+                    statusMessage = "Duplicated ${duplicates.size} note${if (duplicates.size == 1) "" else "s"}"
+                )
+            }
+        }
+        persist()
+    }
+
     fun toggleLocked(note: SNote) {
         val state = _state.value
         if (!note.locked && !state.hasNotePin) {
@@ -1857,6 +1876,9 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
             }
             Button(onClick = { viewModel.batchFavoriteSelected(true) }) {
                 Text("Favorite")
+            }
+            Button(onClick = viewModel::batchDuplicateSelected) {
+                Text("Duplicate")
             }
             Button(onClick = { viewModel.batchLockSelected(true) }) {
                 Text("Lock")
@@ -3735,6 +3757,12 @@ fun List<SNote>.updateByIds(ids: Set<String>, transform: (SNote) -> SNote): List
 
 fun List<SNote>.deleteByIds(ids: Set<String>): List<SNote> =
     filterNot { it.id in ids }
+
+fun List<SNote>.duplicatedNotesByIds(ids: Set<String>, now: Long = System.currentTimeMillis()): List<SNote> =
+    filter { it.id in ids }.mapIndexed { index, note -> note.duplicate(now = now + index) }
+
+fun List<SNote>.duplicateByIds(ids: Set<String>, now: Long = System.currentTimeMillis()): List<SNote> =
+    duplicatedNotesByIds(ids, now) + this
 
 fun Map<String, ArrayDeque<SNote>>.availableNoteIds(): Set<String> =
     filterValues { it.isNotEmpty() }.keys
