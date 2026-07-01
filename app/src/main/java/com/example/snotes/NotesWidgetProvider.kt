@@ -42,28 +42,46 @@ class NotesWidgetProvider : AppWidgetProvider() {
             val openIntent = Intent(context, MainActivity::class.java).apply {
                 summary.noteId?.let { putExtra(EXTRA_OPEN_NOTE_ID, it) }
             }
-            val quickTextIntent = Intent(context, MainActivity::class.java)
-                .setAction(ACTION_QUICK_NOTE)
-                .putExtra(EXTRA_QUICK_NOTE_KIND, NewNoteKind.Text.name)
             val openPendingIntent = PendingIntent.getActivity(
                 context,
                 appWidgetId,
                 openIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            val quickTextPendingIntent = PendingIntent.getActivity(
-                context,
-                appWidgetId + 10_000,
-                quickTextIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
             val views = RemoteViews(context.packageName, R.layout.notes_widget).apply {
                 setTextViewText(R.id.widget_title, summary.title)
                 setTextViewText(R.id.widget_summary, summary.subtitle)
                 setOnClickPendingIntent(R.id.widget_root, openPendingIntent)
-                setOnClickPendingIntent(R.id.widget_quick_note, quickTextPendingIntent)
+                setOnClickPendingIntent(
+                    R.id.widget_quick_text_note,
+                    quickNotePendingIntent(context, appWidgetId + 10_000, NewNoteKind.Text)
+                )
+                setOnClickPendingIntent(
+                    R.id.widget_quick_checklist_note,
+                    quickNotePendingIntent(context, appWidgetId + 20_000, NewNoteKind.Checklist)
+                )
+                setOnClickPendingIntent(
+                    R.id.widget_quick_drawing_note,
+                    quickNotePendingIntent(context, appWidgetId + 30_000, NewNoteKind.Drawing)
+                )
             }
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
+    }
+
+    private fun quickNotePendingIntent(
+        context: Context,
+        requestCode: Int,
+        kind: NewNoteKind
+    ): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java)
+            .setAction(ACTION_QUICK_NOTE)
+            .putExtra(EXTRA_QUICK_NOTE_KIND, kind.name)
+        return PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 }
