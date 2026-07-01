@@ -231,6 +231,24 @@ class NoteModelTest {
     }
 
     @Test
+    fun newNotesInheritActiveFolderOrTagContext() {
+        val folderState = NotesUiState(
+            surface = NotesSurface.Folders,
+            folderFilter = "Work/Product",
+            noteDefaults = NoteDefaults(pageTemplate = PageTemplate.Grid)
+        )
+        val tagState = NotesUiState(surface = NotesSurface.Tags, tagFilter = "launch")
+
+        val folderNote = NewNoteKind.Text.createNoteForState(folderState)
+        val tagNote = NewNoteKind.Checklist.createNoteForState(tagState)
+
+        assertEquals("Work/Product", folderNote.folder)
+        assertEquals(PageTemplate.Grid, folderNote.pageTemplate)
+        assertEquals(listOf("launch"), tagNote.tags)
+        assertTrue(tagNote.blocks.single() is NoteBlock.Checklist)
+    }
+
+    @Test
     fun storedNoteDefaultsFallbackToSupportedValues() {
         val restored = noteDefaultsFromStoredValues("Grid", 0xFFFFF8D6)
         val fallback = noteDefaultsFromStoredValues("LegacyTemplate", 0xFF123456)

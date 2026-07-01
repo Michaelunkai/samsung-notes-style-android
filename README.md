@@ -8,7 +8,7 @@ Current local build version: `0.2.0`.
 
 - Kotlin Android project scaffold using Gradle Kotlin DSL and Jetpack Compose.
 - Notes home screen with list/grid modes, rich note-card metadata, expanded sorting, search scopes, contextual empty states, folders, tags, favorites, pinned notes, trash with restore-all/empty-trash actions, light/dark mode, and multi-select actions including batch duplicate.
-- Folder and tag organization with filters, bulk move/tag actions, and rename actions for selected folders and tags.
+- Folder and tag organization with filters, contextual note creation, bulk move/tag actions, and rename actions for selected folders and tags.
 - Editor screen with auto-persisted title, folder, tag, template, paper color, mixed block changes, and capped note-level undo/redo.
 - In-note search panel with match counts, snippets, previous/next navigation, active-match scrolling, and highlighted matched blocks.
 - Rich text block controls for bold, italic, underline, text color, highlight color, size presets, font family, and alignment.

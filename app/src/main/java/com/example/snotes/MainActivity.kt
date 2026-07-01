@@ -653,7 +653,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<NotesUiState> = _state
 
     fun createNote(kind: NewNoteKind) {
-        val note = kind.createNoteWithDefaults(_state.value.noteDefaults)
+        val note = kind.createNoteForState(_state.value)
         _state.update { it.copy(notes = listOf(note) + it.notes, selectedNoteId = note.id) }
         persist()
     }
@@ -1204,6 +1204,15 @@ fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()):
         pageTemplate = defaults.pageTemplate,
         paperColor = defaults.paperColor
     )
+}
+
+fun NewNoteKind.createNoteForState(state: NotesUiState): SNote {
+    val note = createNoteWithDefaults(state.noteDefaults)
+    return when {
+        state.surface == NotesSurface.Folders && state.folderFilter != null -> note.copy(folder = state.folderFilter)
+        state.surface == NotesSurface.Tags && state.tagFilter != null -> note.copy(tags = listOf(state.tagFilter))
+        else -> note
+    }
 }
 
 fun SNote.duplicate(now: Long = System.currentTimeMillis()): SNote = copy(
