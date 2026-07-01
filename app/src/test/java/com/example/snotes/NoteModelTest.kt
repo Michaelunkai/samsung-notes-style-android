@@ -717,6 +717,8 @@ class NoteModelTest {
         assertEquals("Work/Product", normalizeFolder(" /Work//Product/ "))
         assertEquals(listOf("work", "meeting"), parseTagInput(" #work, meeting, work, "))
         assertEquals(listOf("existing", "work", "meeting"), mergeTags(listOf("existing", "work"), "#work, meeting"))
+        assertEquals(listOf("existing"), removeTags(listOf("existing", "work", "meeting"), "#work, meeting"))
+        assertEquals(listOf("existing"), removeTags(listOf("existing"), " "))
     }
 
     @Test

@@ -453,6 +453,12 @@ fun parseTagInput(tags: String): List<String> =
 fun mergeTags(existing: List<String>, added: String): List<String> =
     (existing + parseTagInput(added)).distinct()
 
+fun removeTags(existing: List<String>, removed: String): List<String> {
+    val targets = parseTagInput(removed).toSet()
+    if (targets.isEmpty()) return existing
+    return existing.filterNot { it in targets }
+}
+
 fun renameFolderPath(folder: String, from: String, to: String): String {
     val source = normalizeFolder(from)
     val target = normalizeFolder(to)
@@ -1015,6 +1021,15 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         updateSelectedNotes { it.copy(tags = mergeTags(it.tags, tags)) }
+    }
+
+    fun batchRemoveTagsSelected(tags: String) {
+        val parsed = parseTagInput(tags)
+        if (parsed.isEmpty()) {
+            _state.update { it.copy(statusMessage = "Enter at least one tag") }
+            return
+        }
+        updateSelectedNotes { it.copy(tags = removeTags(it.tags, tags)) }
     }
 
     fun renameFolder(from: String, to: String) {
@@ -1940,6 +1955,7 @@ fun EmptyNotesState(copy: EmptyNotesCopy, onCreateNote: () -> Unit) {
 fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
     var moveDialogOpen by remember { mutableStateOf(false) }
     var tagDialogOpen by remember { mutableStateOf(false) }
+    var removeTagDialogOpen by remember { mutableStateOf(false) }
     if (moveDialogOpen) {
         BatchTextActionDialog(
             title = "Move to folder",
@@ -1964,6 +1980,18 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
             onDismiss = { tagDialogOpen = false }
         )
     }
+    if (removeTagDialogOpen) {
+        BatchTextActionDialog(
+            title = "Remove tags",
+            label = "Tags",
+            confirmText = "Remove",
+            onConfirm = {
+                viewModel.batchRemoveTagsSelected(it)
+                removeTagDialogOpen = false
+            },
+            onDismiss = { removeTagDialogOpen = false }
+        )
+    }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (!state.allVisibleNotesSelected) {
             OutlinedButton(onClick = viewModel::selectVisibleNotes) {
@@ -1983,6 +2011,9 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
             }
             Button(onClick = { tagDialogOpen = true }) {
                 Text("Tag")
+            }
+            Button(onClick = { removeTagDialogOpen = true }) {
+                Text("Untag")
             }
             if (state.selectedNotesIncludeUnpinned) {
                 Button(onClick = { viewModel.batchPinSelected(true) }) {
