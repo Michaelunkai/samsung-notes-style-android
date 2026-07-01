@@ -187,6 +187,8 @@ const val SETTING_DEFAULT_PAPER_COLOR = "default_paper_color"
 const val SETTING_NOTE_PIN_DIGEST = "note_pin_digest"
 const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
 const val NOTE_HISTORY_LIMIT = 50
+const val BACKUP_SCHEMA_VERSION = 2
+const val BACKUP_APP_ID = "com.example.snotes"
 
 data class NoteLaunchRequest(
     val sharedText: String? = null,
@@ -3912,10 +3914,36 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("updatedAt", updatedAt)
 
 fun notesToBackupJson(notes: List<SNote>): String = JSONObject()
-    .put("schemaVersion", 1)
+    .put("schemaVersion", BACKUP_SCHEMA_VERSION)
+    .put("appId", BACKUP_APP_ID)
     .put("exportedAt", System.currentTimeMillis())
+    .put("noteCount", notes.size)
     .put("notes", JSONArray().also { array -> notes.forEach { array.put(it.toBackupJson()) } })
     .toString(2)
+
+data class BackupMetadata(
+    val schemaVersion: Int,
+    val appId: String,
+    val exportedAt: Long,
+    val noteCount: Int
+)
+
+fun backupMetadataFromJson(rawBackup: String): BackupMetadata? = runCatching {
+    val trimmed = rawBackup.trim()
+    if (trimmed.startsWith("[")) return@runCatching BackupMetadata(
+        schemaVersion = 0,
+        appId = "legacy-array",
+        exportedAt = 0L,
+        noteCount = JSONArray(trimmed).length()
+    )
+    val json = JSONObject(trimmed)
+    BackupMetadata(
+        schemaVersion = json.optInt("schemaVersion", 0),
+        appId = json.optString("appId", "unknown"),
+        exportedAt = json.optLong("exportedAt", 0L),
+        noteCount = json.optInt("noteCount", json.optJSONArray("notes")?.length() ?: 0)
+    )
+}.getOrNull()
 
 fun notesFromBackupJson(rawBackup: String): List<SNote> = runCatching {
     val trimmed = rawBackup.trim()

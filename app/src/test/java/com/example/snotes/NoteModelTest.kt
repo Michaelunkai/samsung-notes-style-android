@@ -839,15 +839,24 @@ class NoteModelTest {
         )
 
         val wrapped = notesFromBackupJson(notesToBackupJson(notes))
+        val metadata = backupMetadataFromJson(notesToBackupJson(notes))
         assertEquals(listOf("Backup two", "Backup one"), wrapped.map { it.title }.sortedDescending())
         assertTrue(wrapped.first { it.title == "Backup two" }.favorite)
+        assertEquals(BACKUP_SCHEMA_VERSION, metadata?.schemaVersion)
+        assertEquals(BACKUP_APP_ID, metadata?.appId)
+        assertEquals(2, metadata?.noteCount)
+        assertTrue((metadata?.exportedAt ?: 0L) > 0L)
 
         val legacyArray = org.json.JSONArray().also { array ->
             notes.forEach { array.put(it.toJson()) }
         }.toString()
         val legacy = notesFromBackupJson(legacyArray)
+        val legacyMetadata = backupMetadataFromJson(legacyArray)
         assertEquals(2, legacy.size)
         assertEquals("Work", legacy.first { it.title == "Backup one" }.folder)
+        assertEquals(0, legacyMetadata?.schemaVersion)
+        assertEquals("legacy-array", legacyMetadata?.appId)
+        assertEquals(2, legacyMetadata?.noteCount)
     }
 
     @Test
