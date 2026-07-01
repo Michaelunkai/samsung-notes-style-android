@@ -129,6 +129,17 @@ class NoteModelTest {
     }
 
     @Test
+    fun storedNoteDefaultsFallbackToSupportedValues() {
+        val restored = noteDefaultsFromStoredValues("Grid", 0xFFFFF8D6)
+        val fallback = noteDefaultsFromStoredValues("LegacyTemplate", 0xFF123456)
+
+        assertEquals(PageTemplate.Grid, restored.pageTemplate)
+        assertEquals(0xFFFFF8D6, restored.paperColor)
+        assertEquals(PageTemplate.Plain, fallback.pageTemplate)
+        assertEquals(DEFAULT_PAPER_COLORS.first(), fallback.paperColor)
+    }
+
+    @Test
     fun launchRequestParserRoutesSharedTextAndQuickNotes() {
         val shared = noteLaunchRequestFrom(
             action = "android.intent.action.SEND",

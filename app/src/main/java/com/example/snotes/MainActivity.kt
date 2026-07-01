@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
@@ -150,6 +151,10 @@ import org.json.JSONObject
 
 const val ACTION_QUICK_NOTE = "com.example.snotes.action.QUICK_NOTE"
 const val EXTRA_QUICK_NOTE_KIND = "com.example.snotes.extra.QUICK_NOTE_KIND"
+const val SETTINGS_STORE = "notes_settings"
+const val SETTING_DARK_MODE = "dark_mode"
+const val SETTING_DEFAULT_PAGE_TEMPLATE = "default_page_template"
+const val SETTING_DEFAULT_PAPER_COLOR = "default_paper_color"
 
 data class NoteLaunchRequest(
     val sharedText: String? = null,
@@ -297,6 +302,18 @@ data class NoteDefaults(
     val paperColor: Long = DEFAULT_PAPER_COLORS.first()
 )
 
+fun noteDefaultsFromStoredValues(templateName: String?, paperColor: Long): NoteDefaults =
+    NoteDefaults(
+        pageTemplate = templateName.orEmpty().toPageTemplate(PageTemplate.Plain),
+        paperColor = paperColor.takeIf { it in DEFAULT_PAPER_COLORS } ?: DEFAULT_PAPER_COLORS.first()
+    )
+
+fun SharedPreferences.loadNoteDefaults(): NoteDefaults =
+    noteDefaultsFromStoredValues(
+        templateName = getString(SETTING_DEFAULT_PAGE_TEMPLATE, PageTemplate.Plain.name),
+        paperColor = getLong(SETTING_DEFAULT_PAPER_COLOR, DEFAULT_PAPER_COLORS.first())
+    )
+
 data class NotesUiState(
     val notes: List<SNote> = emptyList(),
     val selectedNoteId: String? = null,
@@ -394,8 +411,13 @@ enum class NoteViewMode(val label: String) {
 
 class NotesViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = RoomNoteRepository(application)
+    private val settings = application.getSharedPreferences(SETTINGS_STORE, Context.MODE_PRIVATE)
     private val _state = MutableStateFlow(
-        NotesUiState(notes = loadInitialNotes())
+        NotesUiState(
+            notes = loadInitialNotes(),
+            darkMode = settings.getBoolean(SETTING_DARK_MODE, false),
+            noteDefaults = settings.loadNoteDefaults()
+        )
     )
     val state: StateFlow<NotesUiState> = _state
 
@@ -472,14 +494,26 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleTheme() {
         _state.update { it.copy(darkMode = !it.darkMode) }
+        persistSettings()
     }
 
     fun setDefaultPageTemplate(pageTemplate: PageTemplate) {
         _state.update { it.copy(noteDefaults = it.noteDefaults.copy(pageTemplate = pageTemplate)) }
+        persistSettings()
     }
 
     fun setDefaultPaperColor(paperColor: Long) {
         _state.update { it.copy(noteDefaults = it.noteDefaults.copy(paperColor = paperColor)) }
+        persistSettings()
+    }
+
+    private fun persistSettings() {
+        val state = _state.value
+        settings.edit()
+            .putBoolean(SETTING_DARK_MODE, state.darkMode)
+            .putString(SETTING_DEFAULT_PAGE_TEMPLATE, state.noteDefaults.pageTemplate.name)
+            .putLong(SETTING_DEFAULT_PAPER_COLOR, state.noteDefaults.paperColor)
+            .apply()
     }
 
     fun updateNote(note: SNote) {
