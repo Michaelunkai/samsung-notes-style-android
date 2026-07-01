@@ -349,6 +349,23 @@ class NoteModelTest {
     }
 
     @Test
+    fun noteHistoryHelpersCompareEditableContentAndAvailableStacks() {
+        val note = SNote(id = "note", title = "Original", updatedAt = 1)
+        val timestampOnly = note.copy(updatedAt = 2)
+        val edited = note.copy(title = "Edited")
+        val stacks = mapOf(
+            "note" to ArrayDeque(listOf(note)),
+            "empty" to ArrayDeque<SNote>()
+        )
+
+        assertTrue(note.editableContentEquals(timestampOnly))
+        assertFalse(note.editableContentEquals(edited))
+        assertEquals(setOf("note"), stacks.availableNoteIds())
+        assertEquals(note, stacks.getValue("note").popLastOrNull())
+        assertEquals(null, stacks.getValue("note").popLastOrNull())
+    }
+
+    @Test
     fun noteBlocksCanMoveWithinMixedContentNote() {
         val note = SNote(
             blocks = listOf(

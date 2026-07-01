@@ -57,6 +57,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
@@ -183,6 +185,7 @@ const val SETTING_DEFAULT_PAGE_TEMPLATE = "default_page_template"
 const val SETTING_DEFAULT_PAPER_COLOR = "default_paper_color"
 const val SETTING_NOTE_PIN_DIGEST = "note_pin_digest"
 const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
+const val NOTE_HISTORY_LIMIT = 50
 
 data class NoteLaunchRequest(
     val sharedText: String? = null,
@@ -248,6 +251,19 @@ data class SNote(
                 ?.let { (it as NoteBlock.Sticky).text }
             ?: blocks.firstOrNull()?.label.orEmpty()
 }
+
+fun SNote.editableContentEquals(other: SNote): Boolean =
+    id == other.id &&
+        title == other.title &&
+        folder == other.folder &&
+        tags == other.tags &&
+        blocks == other.blocks &&
+        pinned == other.pinned &&
+        favorite == other.favorite &&
+        locked == other.locked &&
+        deleted == other.deleted &&
+        pageTemplate == other.pageTemplate &&
+        paperColor == other.paperColor
 
 sealed class NoteBlock(open val id: String, open val label: String) {
     data class Text(
@@ -476,7 +492,9 @@ data class NotesUiState(
     val darkMode: Boolean = false,
     val noteDefaults: NoteDefaults = NoteDefaults(),
     val notePinDigest: String? = null,
-    val unlockedNoteIds: Set<String> = emptySet()
+    val unlockedNoteIds: Set<String> = emptySet(),
+    val undoAvailableNoteIds: Set<String> = emptySet(),
+    val redoAvailableNoteIds: Set<String> = emptySet()
 ) {
     val visibleNotes: List<SNote>
         get() = notes
@@ -518,6 +536,12 @@ data class NotesUiState(
 
     val hasNotePin: Boolean
         get() = !notePinDigest.isNullOrBlank()
+
+    val selectedNoteCanUndo: Boolean
+        get() = selectedNoteId in undoAvailableNoteIds
+
+    val selectedNoteCanRedo: Boolean
+        get() = selectedNoteId in redoAvailableNoteIds
 }
 
 enum class NotesSurface(val label: String) {
@@ -564,6 +588,8 @@ enum class NoteViewMode(val label: String) {
 class NotesViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = RoomNoteRepository(application)
     private val settings = application.getSharedPreferences(SETTINGS_STORE, Context.MODE_PRIVATE)
+    private val undoStacks = mutableMapOf<String, ArrayDeque<SNote>>()
+    private val redoStacks = mutableMapOf<String, ArrayDeque<SNote>>()
     private val _state = MutableStateFlow(
         NotesUiState(
             notes = loadInitialNotes(),
@@ -722,13 +748,53 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateNote(note: SNote) {
+        val current = _state.value
+        val previous = current.notes.firstOrNull { it.id == note.id }
+        if (previous != null && !previous.editableContentEquals(note)) {
+            undoStacks.getOrPut(note.id) { ArrayDeque() }.apply {
+                if (lastOrNull()?.editableContentEquals(previous) != true) addLast(previous)
+                while (size > NOTE_HISTORY_LIMIT) removeFirst()
+            }
+            redoStacks.remove(note.id)
+        }
         val updated = note.copy(updatedAt = System.currentTimeMillis())
         _state.update { state ->
-            state.copy(notes = state.notes.map {
-                if (it.id == note.id) updated else it
-            })
+            state.copy(
+                notes = state.notes.map {
+                    if (it.id == note.id) updated else it
+                },
+                undoAvailableNoteIds = undoStacks.availableNoteIds(),
+                redoAvailableNoteIds = redoStacks.availableNoteIds()
+            )
         }
         persistNote(updated)
+    }
+
+    fun undoNoteEdit(note: SNote) {
+        val current = _state.value.notes.firstOrNull { it.id == note.id } ?: return
+        val restored = undoStacks[note.id]?.popLastOrNull() ?: return
+        redoStacks.getOrPut(note.id) { ArrayDeque() }.addLast(current)
+        replaceNoteFromHistory(restored.copy(updatedAt = System.currentTimeMillis()), "Undo")
+    }
+
+    fun redoNoteEdit(note: SNote) {
+        val current = _state.value.notes.firstOrNull { it.id == note.id } ?: return
+        val restored = redoStacks[note.id]?.popLastOrNull() ?: return
+        undoStacks.getOrPut(note.id) { ArrayDeque() }.addLast(current)
+        replaceNoteFromHistory(restored.copy(updatedAt = System.currentTimeMillis()), "Redo")
+    }
+
+    private fun replaceNoteFromHistory(note: SNote, message: String) {
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.map { if (it.id == note.id) note else it },
+                selectedNoteId = note.id,
+                undoAvailableNoteIds = undoStacks.availableNoteIds(),
+                redoAvailableNoteIds = redoStacks.availableNoteIds(),
+                statusMessage = message
+            )
+        }
+        persistNote(note)
     }
 
     fun updateTitle(note: SNote, title: String) {
@@ -2115,6 +2181,18 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        enabled = state.selectedNoteCanUndo,
+                        onClick = { viewModel.undoNoteEdit(note) }
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo note edit")
+                    }
+                    IconButton(
+                        enabled = state.selectedNoteCanRedo,
+                        onClick = { viewModel.redoNoteEdit(note) }
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo note edit")
+                    }
                     IconButton(onClick = { editorSearchOpen = !editorSearchOpen }) {
                         Icon(Icons.Default.Search, contentDescription = "Search in note")
                     }
@@ -3534,6 +3612,12 @@ fun List<SNote>.updateByIds(ids: Set<String>, transform: (SNote) -> SNote): List
 
 fun List<SNote>.deleteByIds(ids: Set<String>): List<SNote> =
     filterNot { it.id in ids }
+
+fun Map<String, ArrayDeque<SNote>>.availableNoteIds(): Set<String> =
+    filterValues { it.isNotEmpty() }.keys
+
+fun ArrayDeque<SNote>.popLastOrNull(): SNote? =
+    if (isEmpty()) null else removeLast()
 
 fun NoteBlock.Checklist.progress(): ChecklistProgress =
     ChecklistProgress(done = items.count { it.checked }, total = items.size)
