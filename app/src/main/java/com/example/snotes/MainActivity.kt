@@ -1946,7 +1946,13 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                     selected = state.surface == NotesSurface.Favorites,
                     onClick = { viewModel.setSurface(NotesSurface.Favorites) },
                     icon = { Icon(Icons.Default.Favorite, contentDescription = null) },
-                    label = { Text("Favorites") }
+                    label = { Text("Favs") }
+                )
+                NavigationBarItem(
+                    selected = state.surface == NotesSurface.Locked,
+                    onClick = { viewModel.setSurface(NotesSurface.Locked) },
+                    icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    label = { Text("Locked") }
                 )
                 NavigationBarItem(
                     selected = state.surface == NotesSurface.Trash,
