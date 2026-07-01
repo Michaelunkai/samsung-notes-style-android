@@ -5,15 +5,18 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -110,8 +113,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -200,7 +205,8 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         override val id: String = UUID.randomUUID().toString(),
         val uri: String,
         val name: String,
-        val mimeHint: String = "file"
+        val mimeHint: String = "file",
+        val sizeBytes: Long = 0L
     ) : NoteBlock(id, "Attachment")
 
     data class Audio(
@@ -1015,14 +1021,19 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             isRecording = file != null
         }
     }
-    val attachmentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    val attachmentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val metadata = queryAttachmentMetadata(context, uri)
         viewModel.addBlock(
             note,
             NoteBlock.Attachment(
                 uri = uri.toString(),
-                name = uri.lastPathSegment?.substringAfterLast('/') ?: "Attachment",
-                mimeHint = context.contentResolver.getType(uri) ?: "file"
+                name = metadata.name,
+                mimeHint = metadata.mimeHint,
+                sizeBytes = metadata.sizeBytes
             )
         )
     }
@@ -1058,7 +1069,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                 onAddText = { viewModel.addBlock(note, NoteBlock.Text()) },
                 onAddChecklist = { viewModel.addBlock(note, NoteBlock.Checklist()) },
                 onAddDrawing = { viewModel.addBlock(note, NoteBlock.Drawing()) },
-                onAddAttachment = { attachmentLauncher.launch("*/*") },
+                onAddAttachment = { attachmentLauncher.launch(arrayOf("*/*")) },
                 onRecord = {
                     if (isRecording) {
                         val file = audioRecorder.stop()
@@ -1593,18 +1604,80 @@ fun DrawScope.drawPageTemplate(template: PageTemplate) {
 @Composable
 fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesViewModel) {
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (block.mimeHint.startsWith("image")) Icons.Default.Image else Icons.Default.AttachFile, contentDescription = null)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(block.name, style = MaterialTheme.typography.titleSmall)
-                Text(block.mimeHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (block.isImageAttachment) {
+                val context = LocalContext.current
+                val bitmap = remember(block.uri) {
+                    runCatching {
+                        context.contentResolver.openInputStream(Uri.parse(block.uri))?.use { stream ->
+                            BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                        }
+                    }.getOrNull()
+                }
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = block.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .background(Color(note.paperColor), RoundedCornerShape(8.dp))
+                    )
+                }
             }
-            IconButton(onClick = { viewModel.removeBlock(note, block) }) {
-                Icon(Icons.Default.Delete, "Delete attachment")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (block.isImageAttachment) Icons.Default.Image else Icons.Default.AttachFile, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(block.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        listOf(block.mimeHint, block.sizeLabel).filter { it.isNotBlank() }.joinToString(" • "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                IconButton(onClick = { viewModel.removeBlock(note, block) }) {
+                    Icon(Icons.Default.Delete, "Delete attachment")
+                }
             }
         }
     }
+}
+
+data class AttachmentMetadata(val name: String, val mimeHint: String, val sizeBytes: Long)
+
+fun queryAttachmentMetadata(context: Context, uri: Uri): AttachmentMetadata {
+    var name = uri.lastPathSegment?.substringAfterLast('/') ?: "Attachment"
+    var size = 0L
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+        if (cursor.moveToFirst()) {
+            if (nameIndex >= 0) name = cursor.getString(nameIndex).orEmpty().ifBlank { name }
+            if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex)
+        }
+    }
+    return AttachmentMetadata(
+        name = name,
+        mimeHint = context.contentResolver.getType(uri) ?: "file",
+        sizeBytes = size
+    )
+}
+
+val NoteBlock.Attachment.isImageAttachment: Boolean
+    get() = mimeHint.startsWith("image/")
+
+val NoteBlock.Attachment.sizeLabel: String
+    get() = formatBytes(sizeBytes)
+
+fun formatBytes(sizeBytes: Long): String = when {
+    sizeBytes <= 0L -> ""
+    sizeBytes < 1024L -> "$sizeBytes B"
+    sizeBytes < 1024L * 1024L -> "${sizeBytes / 1024L} KB"
+    else -> "${sizeBytes / (1024L * 1024L)} MB"
 }
 
 @Composable
@@ -1738,6 +1811,7 @@ fun NoteBlock.toJson(): JSONObject {
             .put("uri", uri)
             .put("name", name)
             .put("mimeHint", mimeHint)
+            .put("sizeBytes", sizeBytes)
 
         is NoteBlock.Audio -> json
             .put("type", "audio")
@@ -1797,7 +1871,8 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         id = optString("id", UUID.randomUUID().toString()),
         uri = optString("uri"),
         name = optString("name", "Attachment"),
-        mimeHint = optString("mimeHint", "file")
+        mimeHint = optString("mimeHint", "file"),
+        sizeBytes = optLong("sizeBytes", 0L)
     )
 
     "audio" -> NoteBlock.Audio(

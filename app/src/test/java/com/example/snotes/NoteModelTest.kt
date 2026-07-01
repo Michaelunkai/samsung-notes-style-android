@@ -34,7 +34,7 @@ class NoteModelTest {
                         )
                     )
                 ),
-                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", mimeHint = "application/pdf"),
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", mimeHint = "application/pdf", sizeBytes = 2048),
                 NoteBlock.Audio(path = "/recordings/one.m4a", name = "one.m4a")
             )
         )
@@ -57,6 +57,7 @@ class NoteModelTest {
         assertEquals(DrawTool.Highlighter, (restored.blocks[2] as NoteBlock.Drawing).activeTool)
         assertEquals(DrawTool.Fountain, (restored.blocks[2] as NoteBlock.Drawing).strokes.first().tool)
         assertEquals("brief.pdf", (restored.blocks[3] as NoteBlock.Attachment).name)
+        assertEquals("2 KB", (restored.blocks[3] as NoteBlock.Attachment).sizeLabel)
         assertEquals("one.m4a", (restored.blocks[4] as NoteBlock.Audio).name)
     }
 
@@ -211,5 +212,27 @@ class NoteModelTest {
 
         val titleState = state.copy(search = "Private")
         assertEquals(listOf("Private"), titleState.visibleNotes.map { it.title })
+    }
+
+    @Test
+    fun attachmentMetadataHelpersClassifyImagesAndFormatSizes() {
+        val image = NoteBlock.Attachment(
+            uri = "content://example/photo",
+            name = "photo.jpg",
+            mimeHint = "image/jpeg",
+            sizeBytes = 2_621_440
+        )
+        val file = NoteBlock.Attachment(
+            uri = "content://example/document",
+            name = "document.pdf",
+            mimeHint = "application/pdf",
+            sizeBytes = 900
+        )
+
+        assertTrue(image.isImageAttachment)
+        assertFalse(file.isImageAttachment)
+        assertEquals("2 MB", image.sizeLabel)
+        assertEquals("900 B", file.sizeLabel)
+        assertEquals("", formatBytes(0))
     }
 }
