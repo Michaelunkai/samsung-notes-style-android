@@ -754,6 +754,17 @@ class NoteModelTest {
     }
 
     @Test
+    fun trashHelpersRestoreOrDeleteDeletedNotesOnly() {
+        val active = SNote(id = "active", title = "Active")
+        val deleted = SNote(id = "deleted", title = "Deleted", deleted = true)
+        val notes = listOf(active, deleted)
+
+        assertEquals(listOf("active"), notes.deleteTrash().map { it.id })
+        assertTrue(notes.restoreTrash().none { it.deleted })
+        assertEquals(listOf("active", "deleted"), notes.restoreTrash().map { it.id })
+    }
+
+    @Test
     fun sortModesControlVisibleNoteOrdering() {
         val notes = listOf(
             SNote(title = "Beta", folder = "B", createdAt = 1, updatedAt = 1),

@@ -1041,6 +1041,31 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
+    fun restoreAllTrash() {
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.restoreTrash(),
+                selectedNoteIds = emptySet(),
+                statusMessage = "Restored trash"
+            )
+        }
+        persist()
+    }
+
+    fun emptyTrash() {
+        _state.update { state ->
+            state.copy(
+                notes = state.notes.deleteTrash(),
+                selectedNoteIds = emptySet(),
+                selectedNoteId = state.selectedNoteId.takeUnless { selectedId ->
+                    state.notes.any { it.id == selectedId && it.deleted }
+                },
+                statusMessage = "Trash emptied"
+            )
+        }
+        persist()
+    }
+
     private fun updateSelectedNotes(transform: (SNote) -> SNote) {
         _state.update { state ->
             state.copy(
@@ -2026,6 +2051,18 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
                 onClick = { tagRenameTarget = state.tagFilter },
                 label = { Text("Rename tag") },
                 leadingIcon = { Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+        }
+        if (state.surface == NotesSurface.Trash && state.trashCount > 0) {
+            AssistChip(
+                onClick = viewModel::restoreAllTrash,
+                label = { Text("Restore all") },
+                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+            AssistChip(
+                onClick = viewModel::emptyTrash,
+                label = { Text("Empty trash") },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp)) }
             )
         }
     }
@@ -3780,6 +3817,12 @@ fun List<SNote>.updateByIds(ids: Set<String>, transform: (SNote) -> SNote): List
 
 fun List<SNote>.deleteByIds(ids: Set<String>): List<SNote> =
     filterNot { it.id in ids }
+
+fun List<SNote>.deleteTrash(): List<SNote> =
+    filterNot { it.deleted }
+
+fun List<SNote>.restoreTrash(): List<SNote> =
+    map { note -> if (note.deleted) note.copy(deleted = false) else note }
 
 fun List<SNote>.duplicatedNotesByIds(ids: Set<String>, now: Long = System.currentTimeMillis()): List<SNote> =
     filter { it.id in ids }.mapIndexed { index, note -> note.duplicate(now = now + index) }
