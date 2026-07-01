@@ -167,6 +167,7 @@ import org.json.JSONObject
 
 const val ACTION_QUICK_NOTE = "com.example.snotes.action.QUICK_NOTE"
 const val EXTRA_QUICK_NOTE_KIND = "com.example.snotes.extra.QUICK_NOTE_KIND"
+const val EXTRA_OPEN_NOTE_ID = "com.example.snotes.extra.OPEN_NOTE_ID"
 const val SETTINGS_STORE = "notes_settings"
 const val SETTING_DARK_MODE = "dark_mode"
 const val SETTING_DEFAULT_PAGE_TEMPLATE = "default_page_template"
@@ -177,7 +178,8 @@ const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
 data class NoteLaunchRequest(
     val sharedText: String? = null,
     val sharedAttachments: List<SharedAttachmentRequest> = emptyList(),
-    val quickNoteKind: NewNoteKind? = null
+    val quickNoteKind: NewNoteKind? = null,
+    val openNoteId: String? = null
 )
 
 data class SharedAttachmentRequest(
@@ -1107,6 +1109,7 @@ fun Intent.toNoteLaunchRequest(): NoteLaunchRequest =
         mimeType = type,
         sharedText = getStringExtra(Intent.EXTRA_TEXT),
         quickKindName = getStringExtra(EXTRA_QUICK_NOTE_KIND),
+        openNoteId = getStringExtra(EXTRA_OPEN_NOTE_ID),
         sharedAttachments = sharedStreamUris().map { uri -> SharedAttachmentRequest(uri.toString(), type) }
     )
 
@@ -1115,6 +1118,7 @@ fun noteLaunchRequestFrom(
     mimeType: String?,
     sharedText: String?,
     quickKindName: String?,
+    openNoteId: String? = null,
     sharedAttachments: List<SharedAttachmentRequest> = emptyList()
 ): NoteLaunchRequest {
     val isSharedAction = action == Intent.ACTION_SEND || action == Intent.ACTION_SEND_MULTIPLE
@@ -1129,7 +1133,12 @@ fun noteLaunchRequestFrom(
     val quickKind = quickKindName
         ?.takeIf { action == ACTION_QUICK_NOTE }
         ?.let { raw -> NewNoteKind.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } }
-    return NoteLaunchRequest(sharedText = shared, sharedAttachments = attachments, quickNoteKind = quickKind)
+    return NoteLaunchRequest(
+        sharedText = shared,
+        sharedAttachments = attachments,
+        quickNoteKind = quickKind,
+        openNoteId = openNoteId?.takeIf { it.isNotBlank() }
+    )
 }
 
 @Suppress("DEPRECATION")
@@ -1168,6 +1177,7 @@ fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = 
             request.sharedText?.let { viewModel.createSharedTextNote(it) }
         }
         request.quickNoteKind?.let { viewModel.createNote(it) }
+        request.openNoteId?.let { viewModel.selectNote(it) }
     }
     val scheme = if (state.darkMode) {
         darkColorScheme(

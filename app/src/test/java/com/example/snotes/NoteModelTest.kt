@@ -193,6 +193,13 @@ class NoteModelTest {
             sharedText = null,
             quickKindName = "Drawing"
         )
+        val openNote = noteLaunchRequestFrom(
+            action = null,
+            mimeType = null,
+            sharedText = null,
+            quickKindName = null,
+            openNoteId = "note-42"
+        )
         val invalid = noteLaunchRequestFrom(
             action = ACTION_QUICK_NOTE,
             mimeType = null,
@@ -202,6 +209,7 @@ class NoteModelTest {
 
         assertEquals("Shared meeting note", shared.sharedText)
         assertEquals(NewNoteKind.Drawing, quickDraw.quickNoteKind)
+        assertEquals("note-42", openNote.openNoteId)
         assertEquals(null, invalid.quickNoteKind)
     }
 
@@ -391,8 +399,8 @@ class NoteModelTest {
         val empty = notesWidgetSummary(emptyList())
         val normal = notesWidgetSummary(
             listOf(
-                SNote(title = "Old", updatedAt = 1, blocks = listOf(NoteBlock.Text(text = "Old body"))),
-                SNote(title = "Latest", updatedAt = 3, blocks = listOf(NoteBlock.Text(text = "Latest body"))),
+                SNote(id = "old", title = "Old", updatedAt = 1, blocks = listOf(NoteBlock.Text(text = "Old body"))),
+                SNote(id = "latest", title = "Latest", updatedAt = 3, blocks = listOf(NoteBlock.Text(text = "Latest body"))),
                 SNote(title = "Deleted", deleted = true, updatedAt = 5)
             )
         )
@@ -406,6 +414,7 @@ class NoteModelTest {
 
         assertEquals(NotesWidgetSummary("S Notes Style", "No notes yet"), empty)
         assertEquals("Latest", normal.title)
+        assertEquals("latest", normal.noteId)
         assertTrue(normal.subtitle.contains("Latest body"))
         assertEquals("Pinned", pinned.title)
         assertEquals("Locked note • 1 note", locked.subtitle)

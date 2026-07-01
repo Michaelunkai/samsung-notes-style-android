@@ -9,7 +9,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import kotlinx.coroutines.runBlocking
 
-data class NotesWidgetSummary(val title: String, val subtitle: String)
+data class NotesWidgetSummary(val title: String, val subtitle: String, val noteId: String? = null)
 
 fun notesWidgetSummary(notes: List<SNote>): NotesWidgetSummary {
     val visible = notes.filterNot { it.deleted }.sortedWith(NoteSortMode.ModifiedNewest.comparator)
@@ -21,7 +21,8 @@ fun notesWidgetSummary(notes: List<SNote>): NotesWidgetSummary {
             latest.locked -> "Locked note • ${visible.size} note${if (visible.size == 1) "" else "s"}"
             latest.preview.isNotBlank() -> "${latest.preview} • ${visible.size} note${if (visible.size == 1) "" else "s"}"
             else -> "${latest.folder} • ${visible.size} note${if (visible.size == 1) "" else "s"}"
-        }
+        },
+        noteId = latest?.id
     )
 }
 
@@ -38,7 +39,9 @@ class NotesWidgetProvider : AppWidgetProvider() {
             runBlocking { notesWidgetSummary(RoomNoteRepository(context).load()) }
         }.getOrDefault(notesWidgetSummary(emptyList()))
         appWidgetIds.forEach { appWidgetId ->
-            val openIntent = Intent(context, MainActivity::class.java)
+            val openIntent = Intent(context, MainActivity::class.java).apply {
+                summary.noteId?.let { putExtra(EXTRA_OPEN_NOTE_ID, it) }
+            }
             val quickTextIntent = Intent(context, MainActivity::class.java)
                 .setAction(ACTION_QUICK_NOTE)
                 .putExtra(EXTRA_QUICK_NOTE_KIND, NewNoteKind.Text.name)
