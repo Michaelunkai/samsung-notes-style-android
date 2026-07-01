@@ -12,6 +12,7 @@ import android.graphics.pdf.PdfDocument
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.graphics.Color as AndroidColor
@@ -3052,7 +3053,7 @@ class AudioRecorder(private val context: Context) {
     fun start(): File? = runCatching {
         val audioDir = File(context.filesDir, "audio").apply { mkdirs() }
         val file = File(audioDir, "recording-${System.currentTimeMillis()}.m4a")
-        recorder = MediaRecorder().apply {
+        recorder = createMediaRecorder(context).apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -3073,6 +3074,10 @@ class AudioRecorder(private val context: Context) {
         outputFile
     }.getOrNull()
 }
+
+@Suppress("DEPRECATION")
+fun createMediaRecorder(context: Context): MediaRecorder =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else MediaRecorder()
 
 fun SNote.toJson(): JSONObject = JSONObject()
     .put("id", id)
