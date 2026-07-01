@@ -593,6 +593,14 @@ data class NotesUiState(
     val selectedNotes: List<SNote>
         get() = notes.filter { it.id in selectedNoteIds }
 
+    val librarySummaryLabel: String
+        get() = buildList {
+            add("${visibleNotes.size} notes")
+            if (search.isNotBlank()) add(searchScope.label)
+            add(sortMode.label)
+            add(viewMode.label)
+        }.joinToString(" • ")
+
     val isSelectionMode: Boolean
         get() = selectedNoteIds.isNotEmpty()
 
@@ -1960,6 +1968,13 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                 value = state.search,
                 onValueChange = viewModel::setSearch,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (state.search.isNotBlank()) {
+                        IconButton(onClick = { viewModel.setSearch("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        }
+                    }
+                },
                 placeholder = { Text("Search notes") },
                 singleLine = true
             )
@@ -1982,7 +1997,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                 text = if (state.isSelectionMode) {
                     "${state.selectedNoteIds.size} selected"
                 } else {
-                    "${state.visibleNotes.size} notes • ${state.sortMode.label} • ${state.viewMode.label}"
+                    state.librarySummaryLabel
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

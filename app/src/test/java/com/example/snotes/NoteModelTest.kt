@@ -282,6 +282,15 @@ class NoteModelTest {
     }
 
     @Test
+    fun librarySummaryShowsSearchScopeOnlyWhileSearching() {
+        val idle = NotesUiState(notes = emptyList())
+        val searching = idle.copy(search = "release", searchScope = SearchScope.Tags)
+
+        assertEquals("0 notes • Modified newest • List", idle.librarySummaryLabel)
+        assertEquals("0 notes • Tags • Modified newest • List", searching.librarySummaryLabel)
+    }
+
+    @Test
     fun notesPinHelpersValidateAndVerifyDigest() {
         val digest = hashNotesPin("1234")
 
