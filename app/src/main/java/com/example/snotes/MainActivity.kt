@@ -1131,11 +1131,11 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun batchFavoriteSelected(favorite: Boolean) {
-        updateSelectedNotes { it.copy(favorite = favorite) }
+        updateSelectedNotes(if (favorite) "Favorited selected notes" else "Removed selected favorites") { it.copy(favorite = favorite) }
     }
 
     fun batchPinSelected(pinned: Boolean) {
-        updateSelectedNotes { it.copy(pinned = pinned) }
+        updateSelectedNotes(if (pinned) "Pinned selected notes" else "Unpinned selected notes") { it.copy(pinned = pinned) }
     }
 
     fun batchLockSelected(locked: Boolean) {
@@ -1143,11 +1143,12 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(statusMessage = "Set a Notes PIN in Settings first") }
             return
         }
-        updateSelectedNotes { it.copy(locked = locked) }
+        updateSelectedNotes(if (locked) "Locked selected notes" else "Unlocked selected notes") { it.copy(locked = locked) }
     }
 
     fun batchMoveSelectedToFolder(folder: String) {
-        updateSelectedNotes { it.copy(folder = normalizeFolder(folder)) }
+        val target = normalizeFolder(folder)
+        updateSelectedNotes("Moved selected notes to $target") { it.copy(folder = target) }
     }
 
     fun batchAddTagsSelected(tags: String) {
@@ -1156,7 +1157,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(statusMessage = "Enter at least one tag") }
             return
         }
-        updateSelectedNotes { it.copy(tags = mergeTags(it.tags, tags)) }
+        updateSelectedNotes("Added tags to selected notes") { it.copy(tags = mergeTags(it.tags, tags)) }
     }
 
     fun batchRemoveTagsSelected(tags: String) {
@@ -1165,7 +1166,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(statusMessage = "Enter at least one tag") }
             return
         }
-        updateSelectedNotes { it.copy(tags = removeTags(it.tags, tags)) }
+        updateSelectedNotes("Removed tags from selected notes") { it.copy(tags = removeTags(it.tags, tags)) }
     }
 
     fun renameFolder(from: String, to: String) {
@@ -1237,11 +1238,11 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun batchMoveSelectedToTrash() {
-        updateSelectedNotes { it.copy(deleted = true) }
+        updateSelectedNotes("Moved selected notes to Trash") { it.copy(deleted = true) }
     }
 
     fun batchRestoreSelected() {
-        updateSelectedNotes { it.copy(deleted = false) }
+        updateSelectedNotes("Restored selected notes") { it.copy(deleted = false) }
     }
 
     fun batchDeleteSelectedPermanently() {
@@ -1281,12 +1282,12 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
-    private fun updateSelectedNotes(transform: (SNote) -> SNote) {
+    private fun updateSelectedNotes(statusMessage: String = "Updated selected notes", transform: (SNote) -> SNote) {
         _state.update { state ->
             state.copy(
                 notes = state.notes.updateByIds(state.selectedNoteIds, transform),
                 selectedNoteIds = emptySet(),
-                statusMessage = "Updated selected notes"
+                statusMessage = statusMessage
             )
         }
         persist()
