@@ -88,7 +88,7 @@ class NoteModelTest {
         val state = NotesUiState(
             notes = listOf(
                 SNote(title = "Meeting", folder = "Work", tags = listOf("team"), blocks = listOf(NoteBlock.Text(text = "Roadmap"))),
-                SNote(title = "Groceries", folder = "Personal", tags = listOf("errand"), blocks = listOf(NoteBlock.Checklist())),
+                SNote(title = "Groceries", folder = "Personal", tags = listOf("errand"), locked = true, blocks = listOf(NoteBlock.Checklist())),
                 SNote(title = "Old", folder = "Work", tags = listOf("team"), deleted = true)
             ),
             search = "road",
@@ -101,6 +101,10 @@ class NoteModelTest {
 
         val tagState = state.copy(search = "", folderFilter = null, tagFilter = "errand")
         assertEquals(listOf("Groceries"), tagState.visibleNotes.map { it.title })
+
+        val lockedState = state.copy(search = "", folderFilter = null, tagFilter = null, surface = NotesSurface.Locked)
+        assertEquals(listOf("Groceries"), lockedState.visibleNotes.map { it.title })
+        assertEquals(1, lockedState.lockedCount)
     }
 
     @Test
@@ -108,6 +112,7 @@ class NoteModelTest {
         assertEquals("No matching notes", NotesUiState(search = "missing").emptyNotesCopy().title)
         assertEquals("Trash is empty", NotesUiState(surface = NotesSurface.Trash).emptyNotesCopy().title)
         assertEquals("No favorites yet", NotesUiState(surface = NotesSurface.Favorites).emptyNotesCopy().title)
+        assertEquals("No locked notes", NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().title)
         assertEquals(
             "No notes in Work",
             NotesUiState(surface = NotesSurface.Folders, folderFilter = "Work").emptyNotesCopy().title

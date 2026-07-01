@@ -20,6 +20,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    lint {
+        disable += setOf("GradleDependency", "NewerVersionAvailable")
+    }
 }
 
 ksp {

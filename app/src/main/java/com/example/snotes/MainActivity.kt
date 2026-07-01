@@ -579,6 +579,7 @@ data class NotesUiState(
                 when (surface) {
                     NotesSurface.All, NotesSurface.Folders, NotesSurface.Tags -> !note.deleted
                     NotesSurface.Favorites -> !note.deleted && note.favorite
+                    NotesSurface.Locked -> !note.deleted && note.locked
                     NotesSurface.Trash -> note.deleted
                 }
             }
@@ -624,6 +625,9 @@ data class NotesUiState(
 
     val selectedNotesIncludeUnlocked: Boolean
         get() = selectedNotes.any { !it.locked }
+
+    val lockedCount: Int
+        get() = notes.count { !it.deleted && it.locked }
 
     val folders: List<String>
         get() = notes.filter { !it.deleted }.map { it.folder }.distinct().sorted()
@@ -675,6 +679,7 @@ enum class NotesSurface(val label: String) {
     Folders("Folders"),
     Tags("Tags"),
     Favorites("Favorites"),
+    Locked("Locked notes"),
     Trash("Trash")
 }
 
@@ -750,6 +755,11 @@ fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
     surface == NotesSurface.Favorites -> EmptyNotesCopy(
         title = "No favorites yet",
         subtitle = "Favorite important notes to find them here quickly.",
+        actionLabel = noteDefaults.newNoteKind.title
+    )
+    surface == NotesSurface.Locked -> EmptyNotesCopy(
+        title = "No locked notes",
+        subtitle = "Lock private notes to keep their previews out of search, widgets, and the note list.",
         actionLabel = noteDefaults.newNoteKind.title
     )
     surface == NotesSurface.Folders && folderFilter != null -> EmptyNotesCopy(
@@ -877,7 +887,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         _state.update {
             when (surface) {
                 NotesSurface.All -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
-                NotesSurface.Favorites, NotesSurface.Trash -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
+                NotesSurface.Favorites, NotesSurface.Locked, NotesSurface.Trash -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
                 NotesSurface.Folders -> it.copy(surface = surface, tagFilter = null, folderFilter = it.folderFilter ?: it.rootFolders.firstOrNull() ?: it.folders.firstOrNull())
                 NotesSurface.Tags -> it.copy(surface = surface, folderFilter = null, tagFilter = it.tagFilter ?: it.tags.firstOrNull())
             }
@@ -2330,6 +2340,12 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
             onClick = { viewModel.setSurface(NotesSurface.Favorites) },
             label = { Text("Favorites ${state.favoritesCount}") },
             leadingIcon = { Icon(Icons.Default.Favorite, contentDescription = null, modifier = Modifier.size(16.dp)) }
+        )
+        FilterChip(
+            selected = state.surface == NotesSurface.Locked,
+            onClick = { viewModel.setSurface(NotesSurface.Locked) },
+            label = { Text("Locked ${state.lockedCount}") },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp)) }
         )
         FilterChip(
             selected = state.surface == NotesSurface.Trash,
