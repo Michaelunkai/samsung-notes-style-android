@@ -619,6 +619,12 @@ data class NotesUiState(
     val selectedNotesIncludeNonFavorite: Boolean
         get() = selectedNotes.any { !it.favorite }
 
+    val selectedNotesIncludeLocked: Boolean
+        get() = selectedNotes.any { it.locked }
+
+    val selectedNotesIncludeUnlocked: Boolean
+        get() = selectedNotes.any { !it.locked }
+
     val folders: List<String>
         get() = notes.filter { !it.deleted }.map { it.folder }.distinct().sorted()
 
@@ -2229,8 +2235,15 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
             Button(onClick = viewModel::batchDuplicateSelected) {
                 Text("Duplicate")
             }
-            Button(onClick = { viewModel.batchLockSelected(true) }) {
-                Text("Lock")
+            if (state.selectedNotesIncludeUnlocked) {
+                Button(onClick = { viewModel.batchLockSelected(true) }) {
+                    Text("Lock")
+                }
+            }
+            if (state.selectedNotesIncludeLocked) {
+                Button(onClick = { viewModel.batchLockSelected(false) }) {
+                    Text("Unlock")
+                }
             }
             Button(onClick = viewModel::batchMoveSelectedToTrash) {
                 Text("Trash")

@@ -325,8 +325,8 @@ class NoteModelTest {
     }
 
     @Test
-    fun selectionStateTracksAvailablePinAndFavoriteActions() {
-        val pinnedFavorite = SNote(id = "pinned", pinned = true, favorite = true)
+    fun selectionStateTracksAvailablePinFavoriteAndLockActions() {
+        val pinnedFavorite = SNote(id = "pinned", pinned = true, favorite = true, locked = true)
         val normal = SNote(id = "normal")
         val state = NotesUiState(
             notes = listOf(pinnedFavorite, normal),
@@ -337,10 +337,13 @@ class NoteModelTest {
         assertTrue(state.selectedNotesIncludeUnpinned)
         assertTrue(state.selectedNotesIncludeFavorite)
         assertTrue(state.selectedNotesIncludeNonFavorite)
+        assertTrue(state.selectedNotesIncludeLocked)
+        assertTrue(state.selectedNotesIncludeUnlocked)
 
         val pinnedOnly = state.copy(selectedNoteIds = setOf("pinned"))
         assertFalse(pinnedOnly.selectedNotesIncludeUnpinned)
         assertFalse(pinnedOnly.selectedNotesIncludeNonFavorite)
+        assertFalse(pinnedOnly.selectedNotesIncludeUnlocked)
     }
 
     @Test
