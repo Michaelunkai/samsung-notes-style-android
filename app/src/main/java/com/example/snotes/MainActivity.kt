@@ -185,6 +185,8 @@ const val SETTING_DARK_MODE = "dark_mode"
 const val SETTING_DEFAULT_PAGE_TEMPLATE = "default_page_template"
 const val SETTING_DEFAULT_PAPER_COLOR = "default_paper_color"
 const val SETTING_NOTE_PIN_DIGEST = "note_pin_digest"
+const val SETTING_SORT_MODE = "sort_mode"
+const val SETTING_VIEW_MODE = "view_mode"
 const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
 const val NOTE_HISTORY_LIMIT = 50
 const val BACKUP_SCHEMA_VERSION = 2
@@ -517,6 +519,14 @@ fun SharedPreferences.loadNoteDefaults(): NoteDefaults =
         paperColor = getLong(SETTING_DEFAULT_PAPER_COLOR, DEFAULT_PAPER_COLORS.first())
     )
 
+fun sortModeFromStoredValue(value: String?): NoteSortMode =
+    NoteSortMode.entries.firstOrNull { it.name.equals(value.orEmpty(), ignoreCase = true) }
+        ?: NoteSortMode.ModifiedNewest
+
+fun viewModeFromStoredValue(value: String?): NoteViewMode =
+    NoteViewMode.entries.firstOrNull { it.name.equals(value.orEmpty(), ignoreCase = true) }
+        ?: NoteViewMode.List
+
 fun hashNotesPin(pin: String): String =
     MessageDigest.getInstance("SHA-256")
         .digest("$NOTE_PIN_SALT:${pin.trim()}".toByteArray())
@@ -739,6 +749,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             notes = loadInitialNotes(),
             darkMode = settings.getBoolean(SETTING_DARK_MODE, false),
             noteDefaults = settings.loadNoteDefaults(),
+            sortMode = sortModeFromStoredValue(settings.getString(SETTING_SORT_MODE, NoteSortMode.ModifiedNewest.name)),
+            viewMode = viewModeFromStoredValue(settings.getString(SETTING_VIEW_MODE, NoteViewMode.List.name)),
             notePinDigest = settings.getString(SETTING_NOTE_PIN_DIGEST, null)
         )
     )
@@ -842,12 +854,14 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSortMode(sortMode: NoteSortMode) {
         _state.update { it.copy(sortMode = sortMode) }
+        persistSettings()
     }
 
     fun toggleViewMode() {
         _state.update {
             it.copy(viewMode = if (it.viewMode == NoteViewMode.List) NoteViewMode.Grid else NoteViewMode.List)
         }
+        persistSettings()
     }
 
     fun toggleTheme() {
@@ -872,6 +886,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             .putString(SETTING_DEFAULT_PAGE_TEMPLATE, state.noteDefaults.pageTemplate.name)
             .putLong(SETTING_DEFAULT_PAPER_COLOR, state.noteDefaults.paperColor)
             .putString(SETTING_NOTE_PIN_DIGEST, state.notePinDigest)
+            .putString(SETTING_SORT_MODE, state.sortMode.name)
+            .putString(SETTING_VIEW_MODE, state.viewMode.name)
             .apply()
     }
 

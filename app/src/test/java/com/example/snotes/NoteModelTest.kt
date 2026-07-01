@@ -269,6 +269,15 @@ class NoteModelTest {
     }
 
     @Test
+    fun storedLibraryPreferencesFallbackToSupportedValues() {
+        assertEquals(NoteSortMode.MediaHeavy, sortModeFromStoredValue("MediaHeavy"))
+        assertEquals(NoteSortMode.ChecklistProgress, sortModeFromStoredValue("checklistprogress"))
+        assertEquals(NoteSortMode.ModifiedNewest, sortModeFromStoredValue("LegacySort"))
+        assertEquals(NoteViewMode.Grid, viewModeFromStoredValue("Grid"))
+        assertEquals(NoteViewMode.List, viewModeFromStoredValue("LegacyView"))
+    }
+
+    @Test
     fun notesPinHelpersValidateAndVerifyDigest() {
         val digest = hashNotesPin("1234")
 
