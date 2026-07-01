@@ -14,7 +14,7 @@ class NoteModelTest {
             tags = listOf("meeting", "audio"),
             favorite = true,
             blocks = listOf(
-                NoteBlock.Text(text = "Discuss release", bold = true, italic = true, color = 0xFF1D4ED8),
+                NoteBlock.Text(text = "Discuss release", bold = true, italic = true, underline = true, color = 0xFF1D4ED8),
                 NoteBlock.Checklist(
                     items = listOf(
                         CheckItem(text = "Ship debug build", checked = true),
@@ -22,10 +22,12 @@ class NoteModelTest {
                     )
                 ),
                 NoteBlock.Drawing(
+                    activeTool = DrawTool.Highlighter,
                     strokes = listOf(
                         DrawStroke(
                             color = 0xFF111827,
                             width = 6f,
+                            tool = DrawTool.Fountain,
                             points = listOf(DrawPoint(1f, 2f), DrawPoint(3f, 4f))
                         )
                     )
@@ -44,9 +46,12 @@ class NoteModelTest {
         assertEquals(5, restored.blocks.size)
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
         assertTrue((restored.blocks[0] as NoteBlock.Text).bold)
+        assertTrue((restored.blocks[0] as NoteBlock.Text).underline)
         assertEquals("Ship debug build", (restored.blocks[1] as NoteBlock.Checklist).items[0].text)
         assertTrue((restored.blocks[1] as NoteBlock.Checklist).items[0].checked)
         assertEquals(2, (restored.blocks[2] as NoteBlock.Drawing).strokes.first().points.size)
+        assertEquals(DrawTool.Highlighter, (restored.blocks[2] as NoteBlock.Drawing).activeTool)
+        assertEquals(DrawTool.Fountain, (restored.blocks[2] as NoteBlock.Drawing).strokes.first().tool)
         assertEquals("brief.pdf", (restored.blocks[3] as NoteBlock.Attachment).name)
         assertEquals("one.m4a", (restored.blocks[4] as NoteBlock.Audio).name)
     }
@@ -145,5 +150,23 @@ class NoteModelTest {
 
         val folderState = NotesUiState(notes = notes, sortMode = NoteSortMode.FolderAscending)
         assertEquals(listOf("Favorite", "Alpha", "Beta"), folderState.visibleNotes.map { it.title })
+    }
+
+    @Test
+    fun drawingEraserRemovesOnlyNearbyStrokes() {
+        val nearby = DrawStroke(
+            color = 0xFF111827,
+            width = 4f,
+            points = listOf(DrawPoint(10f, 10f), DrawPoint(20f, 20f))
+        )
+        val far = DrawStroke(
+            color = 0xFF1D4ED8,
+            width = 4f,
+            points = listOf(DrawPoint(200f, 200f), DrawPoint(220f, 220f))
+        )
+
+        val remaining = listOf(nearby, far).eraseNear(listOf(DrawPoint(12f, 12f)), radius = 8f)
+
+        assertEquals(listOf(far), remaining)
     }
 }

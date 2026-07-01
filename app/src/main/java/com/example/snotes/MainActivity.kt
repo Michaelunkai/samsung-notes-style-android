@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.FormatItalic
 import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
@@ -87,6 +88,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -112,6 +114,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -169,6 +172,7 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         val text: String = "",
         val bold: Boolean = false,
         val italic: Boolean = false,
+        val underline: Boolean = false,
         val color: Long = 0xFF2B2A27,
         val highlight: Long = 0x00FFFFFF,
         val sizeSp: Int = 18
@@ -182,6 +186,7 @@ sealed class NoteBlock(open val id: String, open val label: String) {
     data class Drawing(
         override val id: String = UUID.randomUUID().toString(),
         val strokes: List<DrawStroke> = emptyList(),
+        val activeTool: DrawTool = DrawTool.Pen,
         val penColor: Long = 0xFF1D4ED8,
         val strokeWidth: Float = 5f
     ) : NoteBlock(id, "Handwriting")
@@ -213,8 +218,16 @@ data class DrawStroke(
     val id: String = UUID.randomUUID().toString(),
     val color: Long,
     val width: Float,
+    val tool: DrawTool = DrawTool.Pen,
     val points: List<DrawPoint>
 )
+
+enum class DrawTool(val label: String) {
+    Pen("Pen"),
+    Fountain("Fountain"),
+    Highlighter("Highlighter"),
+    Eraser("Eraser")
+}
 
 data class NotesUiState(
     val notes: List<SNote> = emptyList(),
@@ -1013,12 +1026,14 @@ fun EditorToolbar(
 
 @Composable
 fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewModel) {
-    var menuOpen by remember { mutableStateOf(false) }
+    var colorMenuOpen by remember { mutableStateOf(false) }
+    var highlightMenuOpen by remember { mutableStateOf(false) }
     val textStyle = TextStyle(
         color = Color(block.color),
         fontSize = block.sizeSp.sp,
         fontWeight = if (block.bold) FontWeight.Bold else FontWeight.Normal,
-        fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal
+        fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal,
+        textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None
     )
 
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1032,11 +1047,14 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                 IconButton(onClick = { viewModel.updateBlock(note, block.copy(italic = !block.italic)) }) {
                     Icon(Icons.Default.FormatItalic, "Italic")
                 }
+                IconButton(onClick = { viewModel.updateBlock(note, block.copy(underline = !block.underline)) }) {
+                    Icon(Icons.Default.FormatUnderlined, "Underline")
+                }
                 Box {
-                    IconButton(onClick = { menuOpen = true }) {
+                    IconButton(onClick = { colorMenuOpen = true }) {
                         Icon(Icons.Default.Palette, "Color")
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenu(expanded = colorMenuOpen, onDismissRequest = { colorMenuOpen = false }) {
                         listOf(
                             "Ink" to 0xFF2B2A27,
                             "Blue" to 0xFF1D4ED8,
@@ -1054,8 +1072,38 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                                     )
                                 },
                                 onClick = {
-                                    menuOpen = false
+                                    colorMenuOpen = false
                                     viewModel.updateBlock(note, block.copy(color = color))
+                                }
+                            )
+                        }
+                    }
+                }
+                Box {
+                    IconButton(onClick = { highlightMenuOpen = true }) {
+                        Icon(Icons.Default.FormatColorFill, "Highlight")
+                    }
+                    DropdownMenu(expanded = highlightMenuOpen, onDismissRequest = { highlightMenuOpen = false }) {
+                        listOf(
+                            "None" to 0x00FFFFFFL,
+                            "Yellow" to 0xFFFFF59DL,
+                            "Green" to 0xFFBBF7D0L,
+                            "Blue" to 0xFFBFDBFEL,
+                            "Pink" to 0xFFFBCFE8L
+                        ).forEach { (name, color) ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                leadingIcon = {
+                                    Box(
+                                        Modifier
+                                            .size(18.dp)
+                                            .background(Color(color), CircleShape)
+                                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                                    )
+                                },
+                                onClick = {
+                                    highlightMenuOpen = false
+                                    viewModel.updateBlock(note, block.copy(highlight = color))
                                 }
                             )
                         }
@@ -1063,6 +1111,15 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                 }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete text block")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf(14, 18, 22, 28).forEach { size ->
+                    FilterChip(
+                        selected = block.sizeSp == size,
+                        onClick = { viewModel.updateBlock(note, block.copy(sizeSp = size)) },
+                        label = { Text("${size}sp") }
+                    )
                 }
             }
             BasicTextField(
@@ -1143,10 +1200,14 @@ fun ChecklistBlockEditor(note: SNote, block: NoteBlock.Checklist, viewModel: Not
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesViewModel) {
     var selectedColor by remember(block.id) { mutableStateOf(block.penColor) }
+    var selectedTool by remember(block.id) { mutableStateOf(block.activeTool) }
+    var selectedWidth by remember(block.id) { mutableStateOf(block.strokeWidth) }
     var currentStroke by remember { mutableStateOf<DrawStroke?>(null) }
+    var eraserPoints by remember { mutableStateOf<List<DrawPoint>>(emptyList()) }
     val strokes = block.strokes + listOfNotNull(currentStroke)
 
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1155,11 +1216,29 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
                 Icon(Icons.Default.Brush, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Handwriting and drawing", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                TextButton(
+                    enabled = block.strokes.isNotEmpty(),
+                    onClick = { viewModel.updateBlock(note, block.copy(strokes = block.strokes.dropLast(1))) }
+                ) {
+                    Text("Undo")
+                }
                 IconButton(onClick = { viewModel.updateBlock(note, block.copy(strokes = emptyList())) }) {
                     Icon(Icons.Default.FormatColorFill, "Clear drawing")
                 }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete drawing")
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                DrawTool.entries.forEach { tool ->
+                    FilterChip(
+                        selected = selectedTool == tool,
+                        onClick = {
+                            selectedTool = tool
+                            viewModel.updateBlock(note, block.copy(activeTool = tool))
+                        },
+                        label = { Text(tool.label) }
+                    )
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1175,10 +1254,24 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
                             )
                             .clickable {
                                 selectedColor = color
-                                viewModel.updateBlock(note, block.copy(penColor = color))
+                                viewModel.updateBlock(note, block.copy(penColor = color, activeTool = selectedTool))
                             }
                     )
                 }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Stroke", style = MaterialTheme.typography.bodySmall)
+                Slider(
+                    value = selectedWidth,
+                    onValueChange = { selectedWidth = it },
+                    onValueChangeFinished = {
+                        viewModel.updateBlock(note, block.copy(strokeWidth = selectedWidth, activeTool = selectedTool))
+                    },
+                    valueRange = 2f..18f,
+                    steps = 7,
+                    modifier = Modifier.weight(1f)
+                )
+                Text("${selectedWidth.toInt()}px", style = MaterialTheme.typography.bodySmall)
             }
             Canvas(
                 modifier = Modifier
@@ -1186,33 +1279,73 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
                     .height(300.dp)
                     .background(Color(0xFFFFFBF0), RoundedCornerShape(8.dp))
                     .border(1.dp, Color(0xFFD6D3C4), RoundedCornerShape(8.dp))
-                    .pointerInput(block.id, selectedColor) {
+                    .pointerInput(block.id, selectedColor, selectedTool, selectedWidth) {
                         detectDragGestures(
                             onDragStart = { offset ->
-                                currentStroke = DrawStroke(
-                                    color = selectedColor,
-                                    width = block.strokeWidth,
-                                    points = listOf(DrawPoint(offset.x, offset.y))
-                                )
+                                val point = DrawPoint(offset.x, offset.y)
+                                if (selectedTool == DrawTool.Eraser) {
+                                    eraserPoints = listOf(point)
+                                } else {
+                                    currentStroke = DrawStroke(
+                                        color = selectedColor,
+                                        width = selectedWidth,
+                                        tool = selectedTool,
+                                        points = listOf(point)
+                                    )
+                                }
                             },
                             onDrag = { change, _ ->
-                                val old = currentStroke ?: return@detectDragGestures
-                                currentStroke = old.copy(points = old.points + DrawPoint(change.position.x, change.position.y))
+                                val point = DrawPoint(change.position.x, change.position.y)
+                                if (selectedTool == DrawTool.Eraser) {
+                                    eraserPoints = eraserPoints + point
+                                } else {
+                                    val old = currentStroke ?: return@detectDragGestures
+                                    currentStroke = old.copy(points = old.points + point)
+                                }
                             },
                             onDragEnd = {
-                                currentStroke?.let { stroke ->
-                                    viewModel.updateBlock(note, block.copy(strokes = block.strokes + stroke, penColor = selectedColor))
+                                if (selectedTool == DrawTool.Eraser) {
+                                    viewModel.updateBlock(
+                                        note,
+                                        block.copy(
+                                            strokes = block.strokes.eraseNear(eraserPoints, selectedWidth * 2.5f),
+                                            activeTool = selectedTool,
+                                            strokeWidth = selectedWidth
+                                        )
+                                    )
+                                    eraserPoints = emptyList()
+                                } else {
+                                    currentStroke?.let { stroke ->
+                                        viewModel.updateBlock(
+                                            note,
+                                            block.copy(
+                                                strokes = block.strokes + stroke,
+                                                activeTool = selectedTool,
+                                                penColor = selectedColor,
+                                                strokeWidth = selectedWidth
+                                            )
+                                        )
+                                    }
                                 }
                                 currentStroke = null
                             },
-                            onDragCancel = { currentStroke = null }
+                            onDragCancel = {
+                                currentStroke = null
+                                eraserPoints = emptyList()
+                            }
                         )
                     }
             ) {
                 strokes.forEach { stroke ->
+                    val strokeColor = if (stroke.tool == DrawTool.Highlighter) {
+                        Color(stroke.color).copy(alpha = 0.35f)
+                    } else {
+                        Color(stroke.color)
+                    }
+                    val strokeWidth = if (stroke.tool == DrawTool.Fountain) stroke.width * 1.2f else stroke.width
                     if (stroke.points.size == 1) {
                         val point = stroke.points.first()
-                        drawCircle(Color(stroke.color), radius = stroke.width, center = Offset(point.x, point.y))
+                        drawCircle(strokeColor, radius = strokeWidth, center = Offset(point.x, point.y))
                     } else {
                         val path = Path().apply {
                             stroke.points.firstOrNull()?.let { moveTo(it.x, it.y) }
@@ -1220,11 +1353,25 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
                         }
                         drawPath(
                             path = path,
-                            color = Color(stroke.color),
-                            style = Stroke(width = stroke.width, cap = StrokeCap.Round)
+                            color = strokeColor,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+fun List<DrawStroke>.eraseNear(points: List<DrawPoint>, radius: Float): List<DrawStroke> {
+    if (points.isEmpty()) return this
+    val radiusSquared = radius * radius
+    return filterNot { stroke ->
+        stroke.points.any { strokePoint ->
+            points.any { eraserPoint ->
+                val dx = strokePoint.x - eraserPoint.x
+                val dy = strokePoint.y - eraserPoint.y
+                dx * dx + dy * dy <= radiusSquared
             }
         }
     }
@@ -1313,6 +1460,7 @@ fun NoteBlock.toJson(): JSONObject {
             .put("text", text)
             .put("bold", bold)
             .put("italic", italic)
+            .put("underline", underline)
             .put("color", color)
             .put("highlight", highlight)
             .put("sizeSp", sizeSp)
@@ -1327,6 +1475,7 @@ fun NoteBlock.toJson(): JSONObject {
 
         is NoteBlock.Drawing -> json
             .put("type", "drawing")
+            .put("activeTool", activeTool.name)
             .put("penColor", penColor)
             .put("strokeWidth", strokeWidth.toDouble())
             .put("strokes", JSONArray().also { strokeArray ->
@@ -1336,6 +1485,7 @@ fun NoteBlock.toJson(): JSONObject {
                             .put("id", stroke.id)
                             .put("color", stroke.color)
                             .put("width", stroke.width.toDouble())
+                            .put("tool", stroke.tool.name)
                             .put("points", JSONArray().also { points ->
                                 stroke.points.forEach { point ->
                                     points.put(JSONObject().put("x", point.x.toDouble()).put("y", point.y.toDouble()))
@@ -1397,6 +1547,7 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
 
     "drawing" -> NoteBlock.Drawing(
         id = optString("id", UUID.randomUUID().toString()),
+        activeTool = optString("activeTool").toDrawTool(DrawTool.Pen),
         penColor = optLong("penColor", 0xFF1D4ED8),
         strokeWidth = optDouble("strokeWidth", 5.0).toFloat(),
         strokes = optJSONArray("strokes").toStrokes()
@@ -1421,6 +1572,7 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         text = optString("text"),
         bold = optBoolean("bold", false),
         italic = optBoolean("italic", false),
+        underline = optBoolean("underline", false),
         color = optLong("color", 0xFF2B2A27),
         highlight = optLong("highlight", 0x00FFFFFF),
         sizeSp = optInt("sizeSp", 18)
@@ -1453,12 +1605,16 @@ fun JSONArray?.toStrokes(): List<DrawStroke> {
                     id = stroke.optString("id", UUID.randomUUID().toString()),
                     color = stroke.optLong("color", 0xFF1D4ED8),
                     width = stroke.optDouble("width", 5.0).toFloat(),
+                    tool = stroke.optString("tool").toDrawTool(DrawTool.Pen),
                     points = stroke.optJSONArray("points").toPoints()
                 )
             )
         }
     }
 }
+
+fun String.toDrawTool(default: DrawTool): DrawTool =
+    DrawTool.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
 
 fun JSONArray?.toPoints(): List<DrawPoint> {
     if (this == null) return emptyList()
