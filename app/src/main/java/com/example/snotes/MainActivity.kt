@@ -744,22 +744,22 @@ fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
     surface == NotesSurface.Favorites -> EmptyNotesCopy(
         title = "No favorites yet",
         subtitle = "Favorite important notes to find them here quickly.",
-        actionLabel = "Create note"
+        actionLabel = noteDefaults.newNoteKind.title
     )
     surface == NotesSurface.Folders && folderFilter != null -> EmptyNotesCopy(
         title = "No notes in $folderFilter",
         subtitle = "Move notes into this folder or create a new note.",
-        actionLabel = "Create note"
+        actionLabel = noteDefaults.newNoteKind.title
     )
     surface == NotesSurface.Tags && tagFilter != null -> EmptyNotesCopy(
         title = "No notes tagged #$tagFilter",
         subtitle = "Add this tag to a note or start a new one.",
-        actionLabel = "Create note"
+        actionLabel = noteDefaults.newNoteKind.title
     )
     else -> EmptyNotesCopy(
         title = "No notes yet",
         subtitle = "Create a text note, checklist, handwriting page, or imported note.",
-        actionLabel = "Create note"
+        actionLabel = noteDefaults.newNoteKind.title
     )
 }
 
@@ -2010,7 +2010,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
             if (state.visibleNotes.isEmpty()) {
                 EmptyNotesState(
                     copy = state.emptyNotesCopy(),
-                    onCreateNote = { viewModel.createNote(NewNoteKind.Text) }
+                    onCreateNote = { viewModel.createNote(state.noteDefaults.newNoteKind) }
                 )
             } else if (state.viewMode == NoteViewMode.Grid) {
                 LazyVerticalGrid(

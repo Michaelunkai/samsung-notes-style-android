@@ -116,7 +116,11 @@ class NoteModelTest {
             "No notes tagged #project",
             NotesUiState(surface = NotesSurface.Tags, tagFilter = "project").emptyNotesCopy().title
         )
-        assertEquals("Create note", NotesUiState().emptyNotesCopy().actionLabel)
+        assertEquals("New note", NotesUiState().emptyNotesCopy().actionLabel)
+        assertEquals(
+            "New sketch",
+            NotesUiState(noteDefaults = NoteDefaults(newNoteKind = NewNoteKind.Drawing)).emptyNotesCopy().actionLabel
+        )
     }
 
     @Test
