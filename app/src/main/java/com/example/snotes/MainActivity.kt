@@ -56,6 +56,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
@@ -157,6 +158,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -3008,6 +3011,8 @@ fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: ()
                             value = notesPin,
                             onValueChange = { notesPin = it.filter(Char::isDigit).take(12) },
                             label = { Text("PIN") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                             singleLine = true
                         )
                         Button(
@@ -3093,6 +3098,8 @@ fun UnlockNoteDialog(note: SNote, onUnlock: (String) -> Unit, onDismiss: () -> U
                     value = notesPin,
                     onValueChange = { notesPin = it.filter(Char::isDigit).take(12) },
                     label = { Text("Notes PIN") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     singleLine = true
                 )
             }
