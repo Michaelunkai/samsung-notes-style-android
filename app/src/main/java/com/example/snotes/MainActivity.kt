@@ -47,6 +47,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -73,6 +74,8 @@ import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -831,6 +834,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         updateNote(note.copy(blocks = note.blocks.filterNot { it.id == block.id }))
     }
 
+    fun moveBlock(note: SNote, blockId: String, direction: Int) {
+        updateNote(note.moveBlock(blockId, direction))
+    }
+
     private fun persist() {
         val notes = _state.value.notes
         viewModelScope.launch(Dispatchers.IO) {
@@ -930,6 +937,17 @@ fun NoteBlock.duplicateBlock(): NoteBlock = when (this) {
     )
     is NoteBlock.Attachment -> copy(id = UUID.randomUUID().toString())
     is NoteBlock.Audio -> copy(id = UUID.randomUUID().toString())
+}
+
+fun SNote.moveBlock(blockId: String, direction: Int): SNote {
+    val from = blocks.indexOfFirst { it.id == blockId }
+    if (from < 0) return this
+    val to = (from + direction).coerceIn(blocks.indices)
+    if (from == to) return this
+    val reordered = blocks.toMutableList()
+    val block = reordered.removeAt(from)
+    reordered.add(to, block)
+    return copy(blocks = reordered)
 }
 
 fun SNote.toPlainText(): String = buildString {
@@ -1943,13 +1961,36 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             item {
                 NoteMetaEditor(note, state, viewModel)
             }
-            items(note.blocks, key = { it.id }) { block ->
-                when (block) {
-                    is NoteBlock.Text -> TextBlockEditor(note, block, viewModel)
-                    is NoteBlock.Checklist -> ChecklistBlockEditor(note, block, viewModel)
-                    is NoteBlock.Drawing -> DrawingBlockEditor(note, block, viewModel)
-                    is NoteBlock.Attachment -> AttachmentBlock(note, block, viewModel)
-                    is NoteBlock.Audio -> AudioBlock(note, block, viewModel)
+            itemsIndexed(note.blocks, key = { _, block -> block.id }) { index, block ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                    Column(
+                        modifier = Modifier.width(40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        IconButton(
+                            enabled = index > 0,
+                            onClick = { viewModel.moveBlock(note, block.id, -1) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move block up")
+                        }
+                        IconButton(
+                            enabled = index < note.blocks.lastIndex,
+                            onClick = { viewModel.moveBlock(note, block.id, 1) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move block down")
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        when (block) {
+                            is NoteBlock.Text -> TextBlockEditor(note, block, viewModel)
+                            is NoteBlock.Checklist -> ChecklistBlockEditor(note, block, viewModel)
+                            is NoteBlock.Drawing -> DrawingBlockEditor(note, block, viewModel)
+                            is NoteBlock.Attachment -> AttachmentBlock(note, block, viewModel)
+                            is NoteBlock.Audio -> AudioBlock(note, block, viewModel)
+                        }
+                    }
                 }
             }
             item {

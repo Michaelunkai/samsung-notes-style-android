@@ -274,6 +274,25 @@ class NoteModelTest {
     }
 
     @Test
+    fun noteBlocksCanMoveWithinMixedContentNote() {
+        val note = SNote(
+            blocks = listOf(
+                NoteBlock.Text(id = "text", text = "Body"),
+                NoteBlock.Checklist(id = "list"),
+                NoteBlock.Drawing(id = "drawing")
+            )
+        )
+
+        val movedUp = note.moveBlock("drawing", -1)
+        val movedDown = movedUp.moveBlock("drawing", 1)
+
+        assertEquals(listOf("text", "drawing", "list"), movedUp.blocks.map { it.id })
+        assertEquals(listOf("text", "list", "drawing"), movedDown.blocks.map { it.id })
+        assertEquals(note.blocks.map { it.id }, note.moveBlock("text", -1).blocks.map { it.id })
+        assertEquals(note.blocks.map { it.id }, note.moveBlock("missing", 1).blocks.map { it.id })
+    }
+
+    @Test
     fun notePlainTextExportIncludesMixedContent() {
         val note = SNote(
             title = "Sprint review",
