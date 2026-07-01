@@ -555,8 +555,23 @@ data class NotesUiState(
     val rootFolders: List<String>
         get() = folders.map { it.substringBefore("/") }.distinct().sorted()
 
+    val folderSummaries: List<OrganizationSummary>
+        get() = folders.map { folder ->
+            OrganizationSummary(folder, notes.count { !it.deleted && (it.folder == folder || it.folder.startsWith("$folder/")) })
+        }.filter { it.noteCount > 0 }
+
+    val rootFolderSummaries: List<OrganizationSummary>
+        get() = rootFolders.map { folder ->
+            OrganizationSummary(folder, notes.count { !it.deleted && (it.folder == folder || it.folder.startsWith("$folder/")) })
+        }.filter { it.noteCount > 0 }
+
     val tags: List<String>
         get() = notes.filter { !it.deleted }.flatMap { it.tags }.distinct().sorted()
+
+    val tagSummaries: List<OrganizationSummary>
+        get() = tags.map { tag ->
+            OrganizationSummary(tag, notes.count { !it.deleted && tag in it.tags })
+        }.filter { it.noteCount > 0 }
 
     val trashCount: Int
         get() = notes.count { it.deleted }
@@ -572,6 +587,11 @@ data class NotesUiState(
 
     val selectedNoteCanRedo: Boolean
         get() = selectedNoteId in redoAvailableNoteIds
+}
+
+data class OrganizationSummary(val name: String, val noteCount: Int) {
+    val label: String
+        get() = "$name $noteCount"
 }
 
 enum class NotesSurface(val label: String) {
@@ -2134,20 +2154,17 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
             leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp)) }
         )
         val folderChips = if (state.surface == NotesSurface.Folders && state.folderFilter != null) {
-            state.folders
+            state.folderSummaries
         } else {
-            state.rootFolders
+            state.rootFolderSummaries
         }
-        folderChips.forEach { folder ->
-            val childCount = state.notes.count { !it.deleted && (it.folder == folder || it.folder.startsWith("$folder/")) }
-            if (childCount > 0) {
-                FilterChip(
-                    selected = state.folderFilter == folder,
-                    onClick = { viewModel.filterFolder(folder) },
-                    label = { Text("$folder $childCount") },
-                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                )
-            }
+        folderChips.forEach { summary ->
+            FilterChip(
+                selected = state.folderFilter == summary.name,
+                onClick = { viewModel.filterFolder(summary.name) },
+                label = { Text(summary.label) },
+                leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
         }
         if (state.surface == NotesSurface.Folders && state.folderFilter != null) {
             AssistChip(
@@ -2156,11 +2173,11 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
                 leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
             )
         }
-        state.tags.forEach { tag ->
+        state.tagSummaries.forEach { summary ->
             FilterChip(
-                selected = state.tagFilter == tag,
-                onClick = { viewModel.filterTag(tag) },
-                label = { Text("#$tag") },
+                selected = state.tagFilter == summary.name,
+                onClick = { viewModel.filterTag(summary.name) },
+                label = { Text("#${summary.label}") },
                 leadingIcon = { Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(16.dp)) }
             )
         }

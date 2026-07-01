@@ -825,6 +825,14 @@ class NoteModelTest {
         val folderState = NotesUiState(notes = notes, surface = NotesSurface.Folders, folderFilter = "School")
         assertEquals(listOf("Root", "Child"), folderState.visibleNotes.map { it.title })
         assertEquals(listOf("School", "Work"), folderState.rootFolders)
+        assertEquals(
+            listOf(OrganizationSummary("School", 2), OrganizationSummary("Work", 1)),
+            folderState.rootFolderSummaries
+        )
+        assertEquals(
+            listOf(OrganizationSummary("School", 2), OrganizationSummary("School/Physics", 1), OrganizationSummary("Work", 1)),
+            folderState.folderSummaries
+        )
 
         val favoritesState = NotesUiState(notes = notes, surface = NotesSurface.Favorites)
         assertEquals(listOf("Root"), favoritesState.visibleNotes.map { it.title })
@@ -833,6 +841,22 @@ class NoteModelTest {
         val trashState = NotesUiState(notes = notes, surface = NotesSurface.Trash)
         assertEquals(listOf("Trash"), trashState.visibleNotes.map { it.title })
         assertEquals(1, trashState.trashCount)
+    }
+
+    @Test
+    fun tagSummariesCountVisibleOrganizationTags() {
+        val notes = listOf(
+            SNote(title = "Launch", tags = listOf("work", "launch")),
+            SNote(title = "Follow up", tags = listOf("work")),
+            SNote(title = "Old", tags = listOf("work"), deleted = true)
+        )
+        val state = NotesUiState(notes = notes)
+
+        assertEquals(
+            listOf(OrganizationSummary("launch", 1), OrganizationSummary("work", 2)),
+            state.tagSummaries
+        )
+        assertEquals("work 2", state.tagSummaries.last().label)
     }
 
     @Test
