@@ -142,6 +142,36 @@ class NoteModelTest {
     }
 
     @Test
+    fun notesPinHelpersValidateAndVerifyDigest() {
+        val digest = hashNotesPin("1234")
+
+        assertTrue(isUsableNotesPin("1234"))
+        assertTrue(isUsableNotesPin("123456789012"))
+        assertFalse(isUsableNotesPin("123"))
+        assertFalse(isUsableNotesPin("1234567890123"))
+        assertFalse(isUsableNotesPin("12ab"))
+        assertTrue(verifyNotesPin("1234", digest))
+        assertFalse(verifyNotesPin("0000", digest))
+        assertFalse(verifyNotesPin("1234", null))
+        assertTrue(digest != "1234")
+    }
+
+    @Test
+    fun uiStateTracksNotesPinAndSessionUnlocks() {
+        val locked = SNote(id = "locked", title = "Private", locked = true)
+        val state = NotesUiState(
+            notes = listOf(locked),
+            selectedNoteId = "locked",
+            notePinDigest = hashNotesPin("5555"),
+            unlockedNoteIds = setOf("locked")
+        )
+
+        assertTrue(state.hasNotePin)
+        assertEquals(locked, state.selectedNote)
+        assertTrue(locked.id in state.unlockedNoteIds)
+    }
+
+    @Test
     fun launchRequestParserRoutesSharedTextAndQuickNotes() {
         val shared = noteLaunchRequestFrom(
             action = "android.intent.action.SEND",

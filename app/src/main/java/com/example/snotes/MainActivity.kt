@@ -141,6 +141,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -157,6 +158,8 @@ const val SETTINGS_STORE = "notes_settings"
 const val SETTING_DARK_MODE = "dark_mode"
 const val SETTING_DEFAULT_PAGE_TEMPLATE = "default_page_template"
 const val SETTING_DEFAULT_PAPER_COLOR = "default_paper_color"
+const val SETTING_NOTE_PIN_DIGEST = "note_pin_digest"
+const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
 
 data class NoteLaunchRequest(
     val sharedText: String? = null,
@@ -317,6 +320,17 @@ fun SharedPreferences.loadNoteDefaults(): NoteDefaults =
         paperColor = getLong(SETTING_DEFAULT_PAPER_COLOR, DEFAULT_PAPER_COLORS.first())
     )
 
+fun hashNotesPin(pin: String): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest("$NOTE_PIN_SALT:${pin.trim()}".toByteArray())
+        .joinToString("") { "%02x".format(it) }
+
+fun isUsableNotesPin(pin: String): Boolean =
+    pin.length in 4..12 && pin.all { it.isDigit() }
+
+fun verifyNotesPin(pin: String, digest: String?): Boolean =
+    !digest.isNullOrBlank() && isUsableNotesPin(pin) && hashNotesPin(pin) == digest
+
 data class NotesUiState(
     val notes: List<SNote> = emptyList(),
     val selectedNoteId: String? = null,
@@ -330,7 +344,9 @@ data class NotesUiState(
     val searchScope: SearchScope = SearchScope.All,
     val statusMessage: String? = null,
     val darkMode: Boolean = false,
-    val noteDefaults: NoteDefaults = NoteDefaults()
+    val noteDefaults: NoteDefaults = NoteDefaults(),
+    val notePinDigest: String? = null,
+    val unlockedNoteIds: Set<String> = emptySet()
 ) {
     val visibleNotes: List<SNote>
         get() = notes
@@ -369,6 +385,9 @@ data class NotesUiState(
 
     val favoritesCount: Int
         get() = notes.count { !it.deleted && it.favorite }
+
+    val hasNotePin: Boolean
+        get() = !notePinDigest.isNullOrBlank()
 }
 
 enum class NotesSurface(val label: String) {
@@ -419,7 +438,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         NotesUiState(
             notes = loadInitialNotes(),
             darkMode = settings.getBoolean(SETTING_DARK_MODE, false),
-            noteDefaults = settings.loadNoteDefaults()
+            noteDefaults = settings.loadNoteDefaults(),
+            notePinDigest = settings.getString(SETTING_NOTE_PIN_DIGEST, null)
         )
     )
     val state: StateFlow<NotesUiState> = _state
@@ -516,7 +536,35 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             .putBoolean(SETTING_DARK_MODE, state.darkMode)
             .putString(SETTING_DEFAULT_PAGE_TEMPLATE, state.noteDefaults.pageTemplate.name)
             .putLong(SETTING_DEFAULT_PAPER_COLOR, state.noteDefaults.paperColor)
+            .putString(SETTING_NOTE_PIN_DIGEST, state.notePinDigest)
             .apply()
+    }
+
+    fun setNotesPin(pin: String): Boolean {
+        if (!isUsableNotesPin(pin)) {
+            _state.update { it.copy(statusMessage = "Use a 4-12 digit PIN") }
+            return false
+        }
+        _state.update {
+            it.copy(
+                notePinDigest = hashNotesPin(pin),
+                unlockedNoteIds = emptySet(),
+                statusMessage = "Notes PIN updated"
+            )
+        }
+        persistSettings()
+        return true
+    }
+
+    fun clearNotesPin() {
+        _state.update {
+            it.copy(
+                notePinDigest = null,
+                unlockedNoteIds = emptySet(),
+                statusMessage = "Notes PIN removed"
+            )
+        }
+        persistSettings()
     }
 
     fun updateNote(note: SNote) {
@@ -566,14 +614,44 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleLocked(note: SNote) {
+        val state = _state.value
+        if (!note.locked && !state.hasNotePin) {
+            _state.update { it.copy(statusMessage = "Set a Notes PIN in Settings first") }
+            return
+        }
+        if (note.locked && note.id !in state.unlockedNoteIds) {
+            _state.update { it.copy(statusMessage = "Unlock note with PIN first") }
+            return
+        }
         val locked = !note.locked
         updateNote(note.copy(locked = locked))
-        _state.update {
-            it.copy(
-                selectedNoteId = it.selectedNoteId.takeUnless { selectedId -> selectedId == note.id && locked },
-                statusMessage = if (locked) "Note locked" else "Note unlocked"
+        _state.update { current ->
+            current.copy(
+                unlockedNoteIds = current.unlockedNoteIds - note.id,
+                selectedNoteId = current.selectedNoteId.takeUnless { selectedId -> selectedId == note.id && locked },
+                statusMessage = if (locked) "Note locked" else "Note lock removed"
             )
         }
+    }
+
+    fun unlockNote(note: SNote, pin: String): Boolean {
+        val digest = _state.value.notePinDigest
+        if (!note.locked) {
+            selectNote(note.id)
+            return true
+        }
+        if (!verifyNotesPin(pin, digest)) {
+            _state.update { it.copy(statusMessage = "Incorrect Notes PIN") }
+            return false
+        }
+        _state.update {
+            it.copy(
+                unlockedNoteIds = it.unlockedNoteIds + note.id,
+                selectedNoteId = note.id,
+                statusMessage = "Note unlocked for this session"
+            )
+        }
+        return true
     }
 
     fun deleteNote(note: SNote) {
@@ -825,7 +903,7 @@ fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = 
     MaterialTheme(colorScheme = scheme) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             val selected = state.selectedNote
-            if (selected == null || selected.locked) {
+            if (selected == null || (selected.locked && selected.id !in state.unlockedNoteIds)) {
                 NotesHome(state, viewModel)
             } else {
                 NoteEditor(selected, state, viewModel)
@@ -841,6 +919,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
     var createMenuOpen by remember { mutableStateOf(false) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var unlockTarget by remember { mutableStateOf<SNote?>(null) }
     var pendingBackupText by remember { mutableStateOf("") }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -1012,6 +1091,15 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                 onDismiss = { settingsOpen = false }
             )
         }
+        unlockTarget?.let { note ->
+            UnlockNoteDialog(
+                note = note,
+                onUnlock = { pin ->
+                    if (viewModel.unlockNote(note, pin)) unlockTarget = null
+                },
+                onDismiss = { unlockTarget = null }
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1075,12 +1163,16 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 } else {
                                     when {
                                         note.deleted -> Unit
-                                        note.locked -> viewModel.setStatus("Unlock note to edit")
+                                        note.locked && state.hasNotePin -> unlockTarget = note
+                                        note.locked -> viewModel.setStatus("Set a Notes PIN in Settings first")
                                         else -> viewModel.selectNote(note.id)
                                     }
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
+                            onOpenLocked = {
+                                if (state.hasNotePin) unlockTarget = note else viewModel.setStatus("Set a Notes PIN in Settings first")
+                            },
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
@@ -1109,12 +1201,16 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 } else {
                                     when {
                                         note.deleted -> Unit
-                                        note.locked -> viewModel.setStatus("Unlock note to edit")
+                                        note.locked && state.hasNotePin -> unlockTarget = note
+                                        note.locked -> viewModel.setStatus("Set a Notes PIN in Settings first")
                                         else -> viewModel.selectNote(note.id)
                                     }
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
+                            onOpenLocked = {
+                                if (state.hasNotePin) unlockTarget = note else viewModel.setStatus("Set a Notes PIN in Settings first")
+                            },
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
@@ -1234,6 +1330,7 @@ fun NoteCard(
     searchScope: SearchScope,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onOpenLocked: () -> Unit,
     onDuplicate: () -> Unit,
     onTogglePinned: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -1332,14 +1429,25 @@ fun NoteCard(
                                     onToggleFavorite()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text(if (note.locked) "Unlock note" else "Lock note") },
-                                leadingIcon = { Icon(if (note.locked) Icons.Default.LockOpen else Icons.Default.Lock, null) },
-                                onClick = {
-                                    menuOpen = false
-                                    onToggleLock()
-                                }
-                            )
+                            if (note.locked) {
+                                DropdownMenuItem(
+                                    text = { Text("Unlock and edit") },
+                                    leadingIcon = { Icon(Icons.Default.LockOpen, null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        onOpenLocked()
+                                    }
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Lock note") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        onToggleLock()
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Move to Trash") },
                                 leadingIcon = { Icon(Icons.Default.Delete, null) },
@@ -1526,6 +1634,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: () -> Unit) {
+    var notesPin by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Settings") },
@@ -1551,6 +1660,36 @@ fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: ()
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(if (state.darkMode) "Light" else "Dark")
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Locked notes", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        if (state.hasNotePin) "A Notes PIN is set" else "Set a 4-12 digit PIN before locking notes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            modifier = Modifier.weight(1f),
+                            value = notesPin,
+                            onValueChange = { notesPin = it.filter(Char::isDigit).take(12) },
+                            label = { Text("PIN") },
+                            singleLine = true
+                        )
+                        Button(
+                            onClick = {
+                                if (viewModel.setNotesPin(notesPin)) notesPin = ""
+                            }
+                        ) {
+                            Text("Set")
+                        }
+                    }
+                    if (state.hasNotePin) {
+                        OutlinedButton(onClick = viewModel::clearNotesPin) {
+                            Text("Remove PIN")
+                        }
                     }
                 }
 
@@ -1590,6 +1729,37 @@ fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: ()
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("Done")
+            }
+        }
+    )
+}
+
+@Composable
+fun UnlockNoteDialog(note: SNote, onUnlock: (String) -> Unit, onDismiss: () -> Unit) {
+    var notesPin by remember(note.id) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Unlock note") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(note.title, style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = notesPin,
+                    onValueChange = { notesPin = it.filter(Char::isDigit).take(12) },
+                    label = { Text("Notes PIN") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onUnlock(notesPin) }) {
+                Text("Unlock")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )
