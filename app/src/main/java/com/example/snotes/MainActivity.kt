@@ -168,7 +168,13 @@ const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
 
 data class NoteLaunchRequest(
     val sharedText: String? = null,
+    val sharedAttachments: List<SharedAttachmentRequest> = emptyList(),
     val quickNoteKind: NewNoteKind? = null
+)
+
+data class SharedAttachmentRequest(
+    val uri: String,
+    val mimeHint: String?
 )
 
 data class SequencedLaunchRequest(
@@ -468,13 +474,37 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun createSharedTextNote(text: String) {
-        val note = SNote(
+        createSharedNote(
             title = text.lineSequence().firstOrNull()?.take(48)?.ifBlank { "Shared note" } ?: "Shared note",
+            blocks = listOf(NoteBlock.Text(text = text))
+        )
+    }
+
+    fun createSharedImportNote(sharedText: String?, attachments: List<NoteBlock.Attachment>) {
+        val firstAttachment = attachments.firstOrNull()
+        val title = sharedText
+            ?.lineSequence()
+            ?.firstOrNull()
+            ?.take(48)
+            ?.ifBlank { null }
+            ?: firstAttachment?.name?.take(48)
+            ?: "Shared file"
+        val blocks = buildList {
+            if (!sharedText.isNullOrBlank()) add(NoteBlock.Text(text = sharedText))
+            addAll(attachments)
+            if (isEmpty()) add(NoteBlock.Text())
+        }
+        createSharedNote(title = title, blocks = blocks)
+    }
+
+    private fun createSharedNote(title: String, blocks: List<NoteBlock>) {
+        val note = SNote(
+            title = title,
             folder = "Shared",
             tags = listOf("shared"),
             pageTemplate = _state.value.noteDefaults.pageTemplate,
             paperColor = _state.value.noteDefaults.paperColor,
-            blocks = listOf(NoteBlock.Text(text = text))
+            blocks = blocks
         )
         _state.update { it.copy(notes = listOf(note) + it.notes, selectedNoteId = note.id) }
         persist()
@@ -992,31 +1022,68 @@ fun Intent.toNoteLaunchRequest(): NoteLaunchRequest =
         action = action,
         mimeType = type,
         sharedText = getStringExtra(Intent.EXTRA_TEXT),
-        quickKindName = getStringExtra(EXTRA_QUICK_NOTE_KIND)
+        quickKindName = getStringExtra(EXTRA_QUICK_NOTE_KIND),
+        sharedAttachments = sharedStreamUris().map { uri -> SharedAttachmentRequest(uri.toString(), type) }
     )
 
 fun noteLaunchRequestFrom(
     action: String?,
     mimeType: String?,
     sharedText: String?,
-    quickKindName: String?
+    quickKindName: String?,
+    sharedAttachments: List<SharedAttachmentRequest> = emptyList()
 ): NoteLaunchRequest {
+    val isSharedAction = action == Intent.ACTION_SEND || action == Intent.ACTION_SEND_MULTIPLE
     val shared = sharedText
-        ?.takeIf { action == Intent.ACTION_SEND && mimeType?.startsWith("text/") == true }
+        ?.takeIf { isSharedAction && mimeType?.startsWith("text/") == true }
         ?.takeIf { it.isNotBlank() }
+    val attachments = sharedAttachments
+        .takeIf { isSharedAction }
+        .orEmpty()
+        .distinctBy { it.uri }
+        .filter { it.uri.isNotBlank() }
     val quickKind = quickKindName
         ?.takeIf { action == ACTION_QUICK_NOTE }
         ?.let { raw -> NewNoteKind.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } }
-    return NoteLaunchRequest(sharedText = shared, quickNoteKind = quickKind)
+    return NoteLaunchRequest(sharedText = shared, sharedAttachments = attachments, quickNoteKind = quickKind)
+}
+
+@Suppress("DEPRECATION")
+fun Intent.sharedStreamUris(): List<Uri> = buildList {
+    getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let { add(it) }
+    getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let { addAll(it) }
+    val clips = clipData ?: return@buildList
+    repeat(clips.itemCount) { index ->
+        clips.getItemAt(index).uri?.let { add(it) }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = SequencedLaunchRequest(0, NoteLaunchRequest())) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     LaunchedEffect(launchRequest.sequence) {
-        launchRequest.request.sharedText?.let { viewModel.createSharedTextNote(it) }
-        launchRequest.request.quickNoteKind?.let { viewModel.createNote(it) }
+        val request = launchRequest.request
+        if (request.sharedAttachments.isNotEmpty()) {
+            val attachments = request.sharedAttachments.map { shared ->
+                val uri = Uri.parse(shared.uri)
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val metadata = queryAttachmentMetadata(context, uri)
+                NoteBlock.Attachment(
+                    uri = shared.uri,
+                    name = metadata.name,
+                    mimeHint = shared.mimeHint ?: metadata.mimeHint,
+                    sizeBytes = metadata.sizeBytes
+                )
+            }
+            viewModel.createSharedImportNote(request.sharedText, attachments)
+        } else {
+            request.sharedText?.let { viewModel.createSharedTextNote(it) }
+        }
+        request.quickNoteKind?.let { viewModel.createNote(it) }
     }
     val scheme = if (state.darkMode) {
         darkColorScheme(

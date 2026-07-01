@@ -198,6 +198,33 @@ class NoteModelTest {
     }
 
     @Test
+    fun launchRequestParserRoutesSharedAttachments() {
+        val shared = noteLaunchRequestFrom(
+            action = "android.intent.action.SEND_MULTIPLE",
+            mimeType = "application/pdf",
+            sharedText = null,
+            quickKindName = null,
+            sharedAttachments = listOf(
+                SharedAttachmentRequest("content://example/file-1", "application/pdf"),
+                SharedAttachmentRequest("content://example/file-1", "application/pdf"),
+                SharedAttachmentRequest("content://example/file-2", "application/pdf"),
+                SharedAttachmentRequest("", "application/pdf")
+            )
+        )
+        val ignored = noteLaunchRequestFrom(
+            action = ACTION_QUICK_NOTE,
+            mimeType = "application/pdf",
+            sharedText = null,
+            quickKindName = null,
+            sharedAttachments = listOf(SharedAttachmentRequest("content://example/file-3", "application/pdf"))
+        )
+
+        assertEquals(listOf("content://example/file-1", "content://example/file-2"), shared.sharedAttachments.map { it.uri })
+        assertEquals("application/pdf", shared.sharedAttachments.first().mimeHint)
+        assertTrue(ignored.sharedAttachments.isEmpty())
+    }
+
+    @Test
     fun duplicateNoteCreatesIndependentCopyWithFreshMetadata() {
         val original = SNote(
             id = "source",
