@@ -111,6 +111,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -159,6 +160,8 @@ data class SNote(
     val favorite: Boolean = false,
     val locked: Boolean = false,
     val deleted: Boolean = false,
+    val pageTemplate: PageTemplate = PageTemplate.Plain,
+    val paperColor: Long = 0xFFFFFBF0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -229,6 +232,13 @@ enum class DrawTool(val label: String) {
     Fountain("Fountain"),
     Highlighter("Highlighter"),
     Eraser("Eraser")
+}
+
+enum class PageTemplate(val label: String) {
+    Plain("Plain"),
+    Ruled("Ruled"),
+    Grid("Grid"),
+    Dotted("Dotted")
 }
 
 data class NotesUiState(
@@ -410,6 +420,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
                     .distinct()
             )
         )
+    }
+
+    fun updatePageStyle(note: SNote, template: PageTemplate = note.pageTemplate, paperColor: Long = note.paperColor) {
+        updateNote(note.copy(pageTemplate = template, paperColor = paperColor))
     }
 
     fun toggleFavorite(note: SNote) {
@@ -1088,6 +1102,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NoteMetaEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1117,6 +1132,37 @@ fun NoteMetaEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) 
             }
             if (state.folders.isNotEmpty() || state.tags.isNotEmpty()) {
                 Text("Folders and tags update search and filter immediately.", style = MaterialTheme.typography.bodySmall)
+            }
+            Text("Page", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                PageTemplate.entries.forEach { template ->
+                    FilterChip(
+                        selected = note.pageTemplate == template,
+                        onClick = { viewModel.updatePageStyle(note, template = template) },
+                        label = { Text(template.label) }
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf(
+                    0xFFFFFBF0L,
+                    0xFFFFFFFFL,
+                    0xFFFFF8D6L,
+                    0xFFEFF6FFL,
+                    0xFFF5F5F4L
+                ).forEach { color ->
+                    Box(
+                        Modifier
+                            .size(30.dp)
+                            .background(Color(color), CircleShape)
+                            .border(
+                                width = if (note.paperColor == color) 3.dp else 1.dp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                shape = CircleShape
+                            )
+                            .clickable { viewModel.updatePageStyle(note, paperColor = color) }
+                    )
+                }
             }
         }
     }
@@ -1255,7 +1301,10 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
-                    .background(Color(block.highlight), RoundedCornerShape(6.dp))
+                    .background(
+                        if (block.highlight == 0x00FFFFFFL) Color(note.paperColor) else Color(block.highlight),
+                        RoundedCornerShape(6.dp)
+                    )
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
                     .padding(12.dp),
                 decorationBox = { inner ->
@@ -1403,7 +1452,7 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp)
-                    .background(Color(0xFFFFFBF0), RoundedCornerShape(8.dp))
+                    .background(Color(note.paperColor), RoundedCornerShape(8.dp))
                     .border(1.dp, Color(0xFFD6D3C4), RoundedCornerShape(8.dp))
                     .pointerInput(block.id, selectedColor, selectedTool, selectedWidth) {
                         detectDragGestures(
@@ -1462,6 +1511,7 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
                         )
                     }
             ) {
+                drawPageTemplate(note.pageTemplate)
                 strokes.forEach { stroke ->
                     val strokeColor = if (stroke.tool == DrawTool.Highlighter) {
                         Color(stroke.color).copy(alpha = 0.35f)
@@ -1498,6 +1548,43 @@ fun List<DrawStroke>.eraseNear(points: List<DrawPoint>, radius: Float): List<Dra
                 val dx = strokePoint.x - eraserPoint.x
                 val dy = strokePoint.y - eraserPoint.y
                 dx * dx + dy * dy <= radiusSquared
+            }
+        }
+    }
+}
+
+fun DrawScope.drawPageTemplate(template: PageTemplate) {
+    val templateColor = Color(0xFFD6D3C4).copy(alpha = 0.75f)
+    when (template) {
+        PageTemplate.Plain -> Unit
+        PageTemplate.Ruled -> {
+            var y = 36f
+            while (y < size.height) {
+                drawLine(templateColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                y += 34f
+            }
+        }
+        PageTemplate.Grid -> {
+            var x = 32f
+            while (x < size.width) {
+                drawLine(templateColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
+                x += 32f
+            }
+            var y = 32f
+            while (y < size.height) {
+                drawLine(templateColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                y += 32f
+            }
+        }
+        PageTemplate.Dotted -> {
+            var y = 28f
+            while (y < size.height) {
+                var x = 28f
+                while (x < size.width) {
+                    drawCircle(templateColor, radius = 1.8f, center = Offset(x, y))
+                    x += 28f
+                }
+                y += 28f
             }
         }
     }
@@ -1575,6 +1662,8 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("favorite", favorite)
     .put("locked", locked)
     .put("deleted", deleted)
+    .put("pageTemplate", pageTemplate.name)
+    .put("paperColor", paperColor)
     .put("createdAt", createdAt)
     .put("updatedAt", updatedAt)
 
@@ -1667,6 +1756,8 @@ fun JSONObject.toNote(): SNote = SNote(
     favorite = optBoolean("favorite", false),
     locked = optBoolean("locked", false),
     deleted = optBoolean("deleted", false),
+    pageTemplate = optString("pageTemplate").toPageTemplate(PageTemplate.Plain),
+    paperColor = optLong("paperColor", 0xFFFFFBF0),
     createdAt = optLong("createdAt", System.currentTimeMillis()),
     updatedAt = optLong("updatedAt", System.currentTimeMillis())
 )
@@ -1764,6 +1855,9 @@ fun JSONArray?.toStrokes(): List<DrawStroke> {
 
 fun String.toDrawTool(default: DrawTool): DrawTool =
     DrawTool.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
+
+fun String.toPageTemplate(default: PageTemplate): PageTemplate =
+    PageTemplate.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: default
 
 fun JSONArray?.toPoints(): List<DrawPoint> {
     if (this == null) return emptyList()

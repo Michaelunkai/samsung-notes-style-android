@@ -11,6 +11,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import java.io.File
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,9 +38,11 @@ data class NoteEntity(
     val favorite: Boolean,
     val locked: Boolean,
     val deleted: Boolean,
+    val pageTemplate: String = PageTemplate.Plain.name,
+    val paperColor: Long = 0xFFFFFBF0,
     val createdAt: Long,
     val updatedAt: Long,
-    val schemaVersion: Int = 1
+    val schemaVersion: Int = 2
 )
 
 @Dao
@@ -59,7 +63,7 @@ interface NoteDao {
     }
 }
 
-@Database(entities = [NoteEntity::class], version = 1, exportSchema = true)
+@Database(entities = [NoteEntity::class], version = 2, exportSchema = true)
 abstract class NotesDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 }
@@ -109,10 +113,18 @@ object NotesDatabaseProvider {
                 NotesDatabase::class.java,
                 "snotes.db"
             )
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration(false)
                 .build()
                 .also { instance = it }
         }
+
+    private val MIGRATION_1_2 = object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE notes ADD COLUMN pageTemplate TEXT NOT NULL DEFAULT 'Plain'")
+            db.execSQL("ALTER TABLE notes ADD COLUMN paperColor INTEGER NOT NULL DEFAULT 4294966256")
+        }
+    }
 }
 
 fun SNote.toEntity(): NoteEntity = NoteEntity(
@@ -125,6 +137,8 @@ fun SNote.toEntity(): NoteEntity = NoteEntity(
     favorite = favorite,
     locked = locked,
     deleted = deleted,
+    pageTemplate = pageTemplate.name,
+    paperColor = paperColor,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -138,6 +152,8 @@ fun NoteEntity.toNote(): SNote = SNote(
     favorite = favorite,
     locked = locked,
     deleted = deleted,
+    pageTemplate = pageTemplate.toPageTemplate(PageTemplate.Plain),
+    paperColor = paperColor,
     createdAt = createdAt,
     updatedAt = updatedAt
 )

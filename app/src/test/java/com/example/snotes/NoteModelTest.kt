@@ -13,6 +13,8 @@ class NoteModelTest {
             folder = "Work",
             tags = listOf("meeting", "audio"),
             favorite = true,
+            pageTemplate = PageTemplate.Grid,
+            paperColor = 0xFFEFF6FF,
             blocks = listOf(
                 NoteBlock.Text(text = "Discuss release", bold = true, italic = true, underline = true, color = 0xFF1D4ED8),
                 NoteBlock.Checklist(
@@ -43,6 +45,8 @@ class NoteModelTest {
         assertEquals(note.folder, restored.folder)
         assertEquals(note.tags, restored.tags)
         assertTrue(restored.favorite)
+        assertEquals(PageTemplate.Grid, restored.pageTemplate)
+        assertEquals(0xFFEFF6FF, restored.paperColor)
         assertEquals(5, restored.blocks.size)
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
         assertTrue((restored.blocks[0] as NoteBlock.Text).bold)
@@ -84,6 +88,8 @@ class NoteModelTest {
             tags = listOf("lecture", "audio"),
             favorite = true,
             locked = true,
+            pageTemplate = PageTemplate.Ruled,
+            paperColor = 0xFFFFF8D6,
             blocks = listOf(
                 NoteBlock.Text(text = "Momentum notes", highlight = 0xFFFFFF00),
                 NoteBlock.Audio(path = "/audio/lecture.m4a", name = "lecture.m4a", durationHintMs = 42_000),
@@ -106,6 +112,8 @@ class NoteModelTest {
         assertEquals(listOf("lecture", "audio"), restored.tags)
         assertTrue(restored.favorite)
         assertTrue(restored.locked)
+        assertEquals(PageTemplate.Ruled, restored.pageTemplate)
+        assertEquals(0xFFFFF8D6, restored.paperColor)
         assertEquals("Momentum notes", restored.preview)
         assertEquals(3, restored.blocks.size)
         assertEquals("lecture.m4a", (restored.blocks[1] as NoteBlock.Audio).name)
