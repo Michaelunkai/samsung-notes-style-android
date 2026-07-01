@@ -277,6 +277,8 @@ class NoteModelTest {
         assertEquals(NoteSortMode.ModifiedNewest, sortModeFromStoredValue("LegacySort"))
         assertEquals(NoteViewMode.Grid, viewModeFromStoredValue("Grid"))
         assertEquals(NoteViewMode.List, viewModeFromStoredValue("LegacyView"))
+        assertEquals(SearchScope.Attachments, searchScopeFromStoredValue("attachments"))
+        assertEquals(SearchScope.All, searchScopeFromStoredValue("LegacyScope"))
     }
 
     @Test

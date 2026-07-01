@@ -189,6 +189,7 @@ const val SETTING_DEFAULT_NOTE_KIND = "default_note_kind"
 const val SETTING_DEFAULT_PAGE_TEMPLATE = "default_page_template"
 const val SETTING_DEFAULT_PAPER_COLOR = "default_paper_color"
 const val SETTING_NOTE_PIN_DIGEST = "note_pin_digest"
+const val SETTING_SEARCH_SCOPE = "search_scope"
 const val SETTING_SORT_MODE = "sort_mode"
 const val SETTING_VIEW_MODE = "view_mode"
 const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
@@ -538,6 +539,10 @@ fun viewModeFromStoredValue(value: String?): NoteViewMode =
     NoteViewMode.entries.firstOrNull { it.name.equals(value.orEmpty(), ignoreCase = true) }
         ?: NoteViewMode.List
 
+fun searchScopeFromStoredValue(value: String?): SearchScope =
+    SearchScope.entries.firstOrNull { it.name.equals(value.orEmpty(), ignoreCase = true) }
+        ?: SearchScope.All
+
 fun hashNotesPin(pin: String): String =
     MessageDigest.getInstance("SHA-256")
         .digest("$NOTE_PIN_SALT:${pin.trim()}".toByteArray())
@@ -762,6 +767,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             noteDefaults = settings.loadNoteDefaults(),
             sortMode = sortModeFromStoredValue(settings.getString(SETTING_SORT_MODE, NoteSortMode.ModifiedNewest.name)),
             viewMode = viewModeFromStoredValue(settings.getString(SETTING_VIEW_MODE, NoteViewMode.List.name)),
+            searchScope = searchScopeFromStoredValue(settings.getString(SETTING_SEARCH_SCOPE, SearchScope.All.name)),
             notePinDigest = settings.getString(SETTING_NOTE_PIN_DIGEST, null)
         )
     )
@@ -842,6 +848,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSearchScope(searchScope: SearchScope) {
         _state.update { it.copy(searchScope = searchScope) }
+        persistSettings()
     }
 
     fun filterFolder(folder: String?) {
@@ -903,6 +910,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             .putString(SETTING_DEFAULT_PAGE_TEMPLATE, state.noteDefaults.pageTemplate.name)
             .putLong(SETTING_DEFAULT_PAPER_COLOR, state.noteDefaults.paperColor)
             .putString(SETTING_NOTE_PIN_DIGEST, state.notePinDigest)
+            .putString(SETTING_SEARCH_SCOPE, state.searchScope.name)
             .putString(SETTING_SORT_MODE, state.sortMode.name)
             .putString(SETTING_VIEW_MODE, state.viewMode.name)
             .apply()
