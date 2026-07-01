@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -153,6 +154,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import androidx.lifecycle.viewModelScope
@@ -2009,6 +2011,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var recordingStartedAt by remember { mutableStateOf(0L) }
     var pendingNoteExportText by remember { mutableStateOf("") }
     var pendingPdfExportNote by remember { mutableStateOf<SNote?>(null) }
+    var pendingCameraCapture by remember { mutableStateOf<CameraCaptureTarget?>(null) }
     var detailsOpen by remember { mutableStateOf(false) }
     var editorSearchOpen by remember { mutableStateOf(false) }
     var editorSearchQuery by remember(note.id) { mutableStateOf("") }
@@ -2041,6 +2044,16 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             note,
             metadata.toNoteBlock(uri.toString())
         )
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        val target = pendingCameraCapture
+        pendingCameraCapture = null
+        if (captured && target != null) {
+            viewModel.addBlock(note, target.toAttachmentBlock())
+            viewModel.setStatus("Photo added")
+        } else {
+            viewModel.setStatus("Photo capture cancelled")
+        }
     }
     val noteExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -2134,6 +2147,11 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                 onAddSticky = { viewModel.addBlock(note, NoteBlock.Sticky()) },
                 onAddDrawing = { viewModel.addBlock(note, NoteBlock.Drawing()) },
                 onAddAttachment = { attachmentLauncher.launch(arrayOf("*/*")) },
+                onCaptureImage = {
+                    val target = createCameraCaptureTarget(context)
+                    pendingCameraCapture = target
+                    cameraLauncher.launch(target.uri)
+                },
                 onRecord = {
                     if (isRecording) {
                         val file = audioRecorder.stop()
@@ -2544,6 +2562,7 @@ fun EditorToolbar(
     onAddSticky: () -> Unit,
     onAddDrawing: () -> Unit,
     onAddAttachment: () -> Unit,
+    onCaptureImage: () -> Unit,
     onRecord: () -> Unit
 ) {
     Surface(tonalElevation = 4.dp) {
@@ -2559,6 +2578,7 @@ fun EditorToolbar(
             IconButton(onClick = onAddSticky) { Icon(Icons.Default.Description, "Sticky note") }
             IconButton(onClick = onAddDrawing) { Icon(Icons.Default.Brush, "Handwriting") }
             IconButton(onClick = onAddAttachment) { Icon(Icons.Default.AttachFile, "Attachment") }
+            IconButton(onClick = onCaptureImage) { Icon(Icons.Default.CameraAlt, "Capture image") }
             FilledIconButton(onClick = onRecord) {
                 Icon(Icons.Default.Mic, if (isRecording) "Stop recording" else "Record audio")
             }
@@ -3188,6 +3208,16 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
 
 data class AttachmentMetadata(val name: String, val mimeHint: String, val sizeBytes: Long)
 
+data class CameraCaptureTarget(val uri: Uri, val file: File) {
+    fun toAttachmentBlock(): NoteBlock.Attachment =
+        NoteBlock.Attachment(
+            uri = uri.toString(),
+            name = file.name,
+            mimeHint = "image/jpeg",
+            sizeBytes = file.length()
+        )
+}
+
 fun AttachmentMetadata.toNoteBlock(uri: String): NoteBlock =
     if (mimeHint.startsWith("audio/")) {
         NoteBlock.Audio(path = uri, name = name)
@@ -3199,6 +3229,13 @@ fun AttachmentMetadata.toNoteBlock(uri: String): NoteBlock =
             sizeBytes = sizeBytes
         )
     }
+
+fun createCameraCaptureTarget(context: Context): CameraCaptureTarget {
+    val captureDir = File(context.filesDir, "captures").apply { mkdirs() }
+    val file = File(captureDir, "capture-${System.currentTimeMillis()}.jpg")
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    return CameraCaptureTarget(uri, file)
+}
 
 fun queryAttachmentMetadata(context: Context, uri: Uri): AttachmentMetadata {
     var name = uri.lastPathSegment?.substringAfterLast('/') ?: "Attachment"
