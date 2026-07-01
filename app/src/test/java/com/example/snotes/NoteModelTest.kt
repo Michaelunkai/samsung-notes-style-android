@@ -12,6 +12,7 @@ class NoteModelTest {
             title = "Planning",
             folder = "Work",
             tags = listOf("meeting", "audio"),
+            pinned = true,
             favorite = true,
             pageTemplate = PageTemplate.Grid,
             paperColor = 0xFFEFF6FF,
@@ -44,6 +45,7 @@ class NoteModelTest {
         assertEquals(note.title, restored.title)
         assertEquals(note.folder, restored.folder)
         assertEquals(note.tags, restored.tags)
+        assertTrue(restored.pinned)
         assertTrue(restored.favorite)
         assertEquals(PageTemplate.Grid, restored.pageTemplate)
         assertEquals(0xFFEFF6FF, restored.paperColor)
@@ -171,6 +173,7 @@ class NoteModelTest {
             title = "Lecture",
             folder = "School/Physics",
             tags = listOf("lecture", "audio"),
+            pinned = true,
             favorite = true,
             locked = true,
             pageTemplate = PageTemplate.Ruled,
@@ -195,6 +198,7 @@ class NoteModelTest {
         assertEquals(note.id, restored.id)
         assertEquals("School/Physics", restored.folder)
         assertEquals(listOf("lecture", "audio"), restored.tags)
+        assertTrue(restored.pinned)
         assertTrue(restored.favorite)
         assertTrue(restored.locked)
         assertEquals(PageTemplate.Ruled, restored.pageTemplate)
@@ -232,17 +236,18 @@ class NoteModelTest {
         val notes = listOf(
             SNote(title = "Beta", folder = "B", createdAt = 1, updatedAt = 1),
             SNote(title = "Alpha", folder = "A", createdAt = 3, updatedAt = 3),
-            SNote(title = "Favorite", folder = "Z", favorite = true, createdAt = 2, updatedAt = 2)
+            SNote(title = "Favorite", folder = "Z", favorite = true, createdAt = 2, updatedAt = 2),
+            SNote(title = "Pinned", folder = "Z", pinned = true, createdAt = 1, updatedAt = 1)
         )
 
         val titleState = NotesUiState(notes = notes, sortMode = NoteSortMode.TitleAscending)
-        assertEquals(listOf("Favorite", "Alpha", "Beta"), titleState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), titleState.visibleNotes.map { it.title })
 
         val createdState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedNewest)
-        assertEquals(listOf("Favorite", "Alpha", "Beta"), createdState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), createdState.visibleNotes.map { it.title })
 
         val folderState = NotesUiState(notes = notes, sortMode = NoteSortMode.FolderAscending)
-        assertEquals(listOf("Favorite", "Alpha", "Beta"), folderState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta"), folderState.visibleNotes.map { it.title })
     }
 
     @Test

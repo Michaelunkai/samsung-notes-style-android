@@ -25,6 +25,7 @@ import org.json.JSONObject
         Index("folder"),
         Index("updatedAt"),
         Index("deleted"),
+        Index("pinned"),
         Index("favorite")
     ]
 )
@@ -35,6 +36,7 @@ data class NoteEntity(
     val tagsJson: String,
     val preview: String,
     val blocksJson: String,
+    val pinned: Boolean = false,
     val favorite: Boolean,
     val locked: Boolean,
     val deleted: Boolean,
@@ -42,12 +44,12 @@ data class NoteEntity(
     val paperColor: Long = 0xFFFFFBF0,
     val createdAt: Long,
     val updatedAt: Long,
-    val schemaVersion: Int = 2
+    val schemaVersion: Int = 3
 )
 
 @Dao
 interface NoteDao {
-    @Query("SELECT * FROM notes ORDER BY favorite DESC, updatedAt DESC")
+    @Query("SELECT * FROM notes ORDER BY pinned DESC, favorite DESC, updatedAt DESC")
     suspend fun loadAll(): List<NoteEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -63,7 +65,7 @@ interface NoteDao {
     }
 }
 
-@Database(entities = [NoteEntity::class], version = 2, exportSchema = true)
+@Database(entities = [NoteEntity::class], version = 3, exportSchema = true)
 abstract class NotesDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 }
@@ -113,7 +115,7 @@ object NotesDatabaseProvider {
                 NotesDatabase::class.java,
                 "snotes.db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration(false)
                 .build()
                 .also { instance = it }
@@ -125,6 +127,13 @@ object NotesDatabaseProvider {
             db.execSQL("ALTER TABLE notes ADD COLUMN paperColor INTEGER NOT NULL DEFAULT 4294966256")
         }
     }
+
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_pinned ON notes(pinned)")
+        }
+    }
 }
 
 fun SNote.toEntity(): NoteEntity = NoteEntity(
@@ -134,6 +143,7 @@ fun SNote.toEntity(): NoteEntity = NoteEntity(
     tagsJson = JSONArray(tags).toString(),
     preview = preview,
     blocksJson = JSONArray().also { array -> blocks.forEach { array.put(it.toJson()) } }.toString(),
+    pinned = pinned,
     favorite = favorite,
     locked = locked,
     deleted = deleted,
@@ -149,6 +159,7 @@ fun NoteEntity.toNote(): SNote = SNote(
     folder = folder,
     tags = JSONArray(tagsJson).toStringList(),
     blocks = JSONArray(blocksJson).toBlocks().ifEmpty { listOf(NoteBlock.Text()) },
+    pinned = pinned,
     favorite = favorite,
     locked = locked,
     deleted = deleted,

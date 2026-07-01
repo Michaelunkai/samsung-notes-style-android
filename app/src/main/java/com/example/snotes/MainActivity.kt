@@ -73,6 +73,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -197,6 +198,7 @@ data class SNote(
     val folder: String = "All notes",
     val tags: List<String> = emptyList(),
     val blocks: List<NoteBlock> = listOf(NoteBlock.Text()),
+    val pinned: Boolean = false,
     val favorite: Boolean = false,
     val locked: Boolean = false,
     val deleted: Boolean = false,
@@ -388,19 +390,19 @@ enum class SearchScope(val label: String) {
 enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
     ModifiedNewest(
         "Date modified",
-        compareByDescending<SNote> { it.favorite }.thenByDescending { it.updatedAt }
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenByDescending { it.updatedAt }
     ),
     CreatedNewest(
         "Date created",
-        compareByDescending<SNote> { it.favorite }.thenByDescending { it.createdAt }
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenByDescending { it.createdAt }
     ),
     TitleAscending(
         "Title",
-        compareByDescending<SNote> { it.favorite }.thenBy { it.title.lowercase() }
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.title.lowercase() }
     ),
     FolderAscending(
         "Folder",
-        compareByDescending<SNote> { it.favorite }.thenBy { it.folder.lowercase() }.thenBy { it.title.lowercase() }
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.folder.lowercase() }.thenBy { it.title.lowercase() }
     )
 }
 
@@ -552,6 +554,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         updateNote(note.copy(favorite = !note.favorite))
     }
 
+    fun togglePinned(note: SNote) {
+        updateNote(note.copy(pinned = !note.pinned))
+    }
+
     fun toggleLocked(note: SNote) {
         val locked = !note.locked
         updateNote(note.copy(locked = locked))
@@ -584,6 +590,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun batchFavoriteSelected(favorite: Boolean) {
         updateSelectedNotes { it.copy(favorite = favorite) }
+    }
+
+    fun batchPinSelected(pinned: Boolean) {
+        updateSelectedNotes { it.copy(pinned = pinned) }
     }
 
     fun batchLockSelected(locked: Boolean) {
@@ -1036,6 +1046,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
+                            onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onToggleLock = { viewModel.toggleLocked(note) },
                             onMoveToTrash = { viewModel.deleteNote(note) },
@@ -1068,6 +1079,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 }
                             },
                             onLongClick = { viewModel.toggleNoteSelection(note.id) },
+                            onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onToggleLock = { viewModel.toggleLocked(note) },
                             onMoveToTrash = { viewModel.deleteNote(note) },
@@ -1107,6 +1119,9 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
                 Text("Delete")
             }
         } else {
+            Button(onClick = { viewModel.batchPinSelected(true) }) {
+                Text("Pin")
+            }
             Button(onClick = { viewModel.batchFavoriteSelected(true) }) {
                 Text("Favorite")
             }
@@ -1182,6 +1197,7 @@ fun NoteCard(
     searchScope: SearchScope,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onTogglePinned: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleLock: () -> Unit,
     onMoveToTrash: () -> Unit,
@@ -1212,6 +1228,7 @@ fun NoteCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
+                if (note.pinned) Icon(Icons.Default.PushPin, contentDescription = "Pinned", tint = MaterialTheme.colorScheme.primary)
                 if (note.favorite) Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color(0xFFE3A008))
                 if (note.locked) Icon(Icons.Default.Lock, contentDescription = "Locked", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box {
@@ -1251,6 +1268,14 @@ fun NoteCard(
                                 onClick = {
                                     menuOpen = false
                                     onLongClick()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (note.pinned) "Unpin note" else "Pin note") },
+                                leadingIcon = { Icon(Icons.Default.PushPin, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onTogglePinned()
                                 }
                             )
                             DropdownMenuItem(
@@ -1373,6 +1398,13 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.togglePinned(note) }) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = "Pin note",
+                            tint = if (note.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = { viewModel.toggleFavorite(note) }) {
                         Icon(
                             if (note.favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -2299,6 +2331,7 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("folder", folder)
     .put("tags", JSONArray(tags))
     .put("blocks", JSONArray().also { array -> blocks.forEach { array.put(it.toJson()) } })
+    .put("pinned", pinned)
     .put("favorite", favorite)
     .put("locked", locked)
     .put("deleted", deleted)
@@ -2394,6 +2427,7 @@ fun JSONObject.toNote(): SNote = SNote(
     folder = optString("folder", "All notes"),
     tags = optJSONArray("tags").toStringList(),
     blocks = optJSONArray("blocks").toBlocks().ifEmpty { listOf(NoteBlock.Text()) },
+    pinned = optBoolean("pinned", false),
     favorite = optBoolean("favorite", false),
     locked = optBoolean("locked", false),
     deleted = optBoolean("deleted", false),
