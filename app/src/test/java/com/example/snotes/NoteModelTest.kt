@@ -291,6 +291,25 @@ class NoteModelTest {
     }
 
     @Test
+    fun selectionStateTracksAvailablePinAndFavoriteActions() {
+        val pinnedFavorite = SNote(id = "pinned", pinned = true, favorite = true)
+        val normal = SNote(id = "normal")
+        val state = NotesUiState(
+            notes = listOf(pinnedFavorite, normal),
+            selectedNoteIds = setOf("pinned", "normal")
+        )
+
+        assertTrue(state.selectedNotesIncludePinned)
+        assertTrue(state.selectedNotesIncludeUnpinned)
+        assertTrue(state.selectedNotesIncludeFavorite)
+        assertTrue(state.selectedNotesIncludeNonFavorite)
+
+        val pinnedOnly = state.copy(selectedNoteIds = setOf("pinned"))
+        assertFalse(pinnedOnly.selectedNotesIncludeUnpinned)
+        assertFalse(pinnedOnly.selectedNotesIncludeNonFavorite)
+    }
+
+    @Test
     fun launchRequestParserRoutesSharedTextAndQuickNotes() {
         val shared = noteLaunchRequestFrom(
             action = "android.intent.action.SEND",

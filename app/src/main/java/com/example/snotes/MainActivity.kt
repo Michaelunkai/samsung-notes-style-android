@@ -528,6 +528,18 @@ data class NotesUiState(
     val isSelectionMode: Boolean
         get() = selectedNoteIds.isNotEmpty()
 
+    val selectedNotesIncludePinned: Boolean
+        get() = selectedNotes.any { it.pinned }
+
+    val selectedNotesIncludeUnpinned: Boolean
+        get() = selectedNotes.any { !it.pinned }
+
+    val selectedNotesIncludeFavorite: Boolean
+        get() = selectedNotes.any { it.favorite }
+
+    val selectedNotesIncludeNonFavorite: Boolean
+        get() = selectedNotes.any { !it.favorite }
+
     val folders: List<String>
         get() = notes.filter { !it.deleted }.map { it.folder }.distinct().sorted()
 
@@ -1933,11 +1945,25 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel) {
             Button(onClick = { tagDialogOpen = true }) {
                 Text("Tag")
             }
-            Button(onClick = { viewModel.batchPinSelected(true) }) {
-                Text("Pin")
+            if (state.selectedNotesIncludeUnpinned) {
+                Button(onClick = { viewModel.batchPinSelected(true) }) {
+                    Text("Pin")
+                }
             }
-            Button(onClick = { viewModel.batchFavoriteSelected(true) }) {
-                Text("Favorite")
+            if (state.selectedNotesIncludePinned) {
+                Button(onClick = { viewModel.batchPinSelected(false) }) {
+                    Text("Unpin")
+                }
+            }
+            if (state.selectedNotesIncludeNonFavorite) {
+                Button(onClick = { viewModel.batchFavoriteSelected(true) }) {
+                    Text("Favorite")
+                }
+            }
+            if (state.selectedNotesIncludeFavorite) {
+                Button(onClick = { viewModel.batchFavoriteSelected(false) }) {
+                    Text("Unfavorite")
+                }
             }
             Button(onClick = viewModel::batchDuplicateSelected) {
                 Text("Duplicate")
