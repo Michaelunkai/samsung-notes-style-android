@@ -1082,6 +1082,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     fun exportBackupText(): String = notesToBackupJson(_state.value.notes)
 
     fun restoreBackupText(rawBackup: String) {
+        val metadata = backupMetadataFromJson(rawBackup)
         val imported = notesFromBackupJson(rawBackup)
         if (imported.isEmpty()) {
             _state.update { it.copy(statusMessage = "No notes found in backup") }
@@ -1094,7 +1095,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             state.copy(
                 notes = merged,
                 selectedNoteId = imported.firstOrNull()?.id,
-                statusMessage = "Imported ${imported.size} notes"
+                statusMessage = backupImportStatus(imported.size, metadata)
             )
         }
         persist()
@@ -3975,6 +3976,17 @@ fun backupMetadataFromJson(rawBackup: String): BackupMetadata? = runCatching {
         noteCount = json.optInt("noteCount", json.optJSONArray("notes")?.length() ?: 0)
     )
 }.getOrNull()
+
+fun backupImportStatus(importedCount: Int, metadata: BackupMetadata?): String {
+    val noteLabel = if (importedCount == 1) "note" else "notes"
+    val source = when (metadata?.appId) {
+        BACKUP_APP_ID -> " from S Notes Style backup v${metadata.schemaVersion}"
+        "legacy-array" -> " from legacy backup"
+        null, "unknown" -> ""
+        else -> " from ${metadata.appId} backup v${metadata.schemaVersion}"
+    }
+    return "Imported $importedCount $noteLabel$source"
+}
 
 fun notesFromBackupJson(rawBackup: String): List<SNote> = runCatching {
     val trimmed = rawBackup.trim()

@@ -898,6 +898,30 @@ class NoteModelTest {
     }
 
     @Test
+    fun backupImportStatusNamesSourceWhenMetadataExists() {
+        assertEquals(
+            "Imported 2 notes from S Notes Style backup v$BACKUP_SCHEMA_VERSION",
+            backupImportStatus(
+                importedCount = 2,
+                metadata = BackupMetadata(
+                    schemaVersion = BACKUP_SCHEMA_VERSION,
+                    appId = BACKUP_APP_ID,
+                    exportedAt = 1L,
+                    noteCount = 2
+                )
+            )
+        )
+        assertEquals(
+            "Imported 1 note from legacy backup",
+            backupImportStatus(
+                importedCount = 1,
+                metadata = BackupMetadata(schemaVersion = 0, appId = "legacy-array", exportedAt = 0L, noteCount = 1)
+            )
+        )
+        assertEquals("Imported 3 notes", backupImportStatus(importedCount = 3, metadata = null))
+    }
+
+    @Test
     fun lockedNotesHidePreviewContentFromSearch() {
         val state = NotesUiState(
             notes = listOf(

@@ -21,7 +21,7 @@ Current local build version: `0.2.0`.
 - Local offline-first Room persistence with a first-run migration path from the legacy JSON note store.
 - Row-level Room upserts for normal note edits to avoid rewriting the whole note table during editor changes.
 - Local Notes PIN support for locked notes, with locked previews hidden from search and widgets.
-- JSON backup export/import with schema/app/note-count metadata plus per-note plain text export/share and PDF export.
+- JSON backup export/import with schema/app/note-count metadata, source-aware import status, plus per-note plain text export/share and PDF export.
 - Android share targets for incoming text, images, PDFs, generic files, and audio.
 - Home-screen widget provider with latest-note preview, latest-note open target, and quick text/checklist/sticky/handwriting actions.
 - Static launcher shortcuts for quick text, checklist, sticky, and handwriting notes.
