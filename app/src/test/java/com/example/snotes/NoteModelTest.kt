@@ -259,11 +259,13 @@ class NoteModelTest {
 
     @Test
     fun storedNoteDefaultsFallbackToSupportedValues() {
-        val restored = noteDefaultsFromStoredValues("Grid", 0xFFFFF8D6)
-        val fallback = noteDefaultsFromStoredValues("LegacyTemplate", 0xFF123456)
+        val restored = noteDefaultsFromStoredValues("Meeting", "Grid", 0xFFFFF8D6)
+        val fallback = noteDefaultsFromStoredValues("LegacyKind", "LegacyTemplate", 0xFF123456)
 
+        assertEquals(NewNoteKind.Meeting, restored.newNoteKind)
         assertEquals(PageTemplate.Grid, restored.pageTemplate)
         assertEquals(0xFFFFF8D6, restored.paperColor)
+        assertEquals(NewNoteKind.Text, fallback.newNoteKind)
         assertEquals(PageTemplate.Plain, fallback.pageTemplate)
         assertEquals(DEFAULT_PAPER_COLORS.first(), fallback.paperColor)
     }

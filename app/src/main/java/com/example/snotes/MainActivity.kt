@@ -182,6 +182,7 @@ const val EXTRA_QUICK_NOTE_KIND = "com.example.snotes.extra.QUICK_NOTE_KIND"
 const val EXTRA_OPEN_NOTE_ID = "com.example.snotes.extra.OPEN_NOTE_ID"
 const val SETTINGS_STORE = "notes_settings"
 const val SETTING_DARK_MODE = "dark_mode"
+const val SETTING_DEFAULT_NOTE_KIND = "default_note_kind"
 const val SETTING_DEFAULT_PAGE_TEMPLATE = "default_page_template"
 const val SETTING_DEFAULT_PAPER_COLOR = "default_paper_color"
 const val SETTING_NOTE_PIN_DIGEST = "note_pin_digest"
@@ -455,12 +456,14 @@ val STICKY_NOTE_COLORS = listOf(
 )
 
 data class NoteDefaults(
+    val newNoteKind: NewNoteKind = NewNoteKind.Text,
     val pageTemplate: PageTemplate = PageTemplate.Plain,
     val paperColor: Long = DEFAULT_PAPER_COLORS.first()
 )
 
-fun noteDefaultsFromStoredValues(templateName: String?, paperColor: Long): NoteDefaults =
+fun noteDefaultsFromStoredValues(kindName: String?, templateName: String?, paperColor: Long): NoteDefaults =
     NoteDefaults(
+        newNoteKind = newNoteKindFromStoredValue(kindName),
         pageTemplate = templateName.orEmpty().toPageTemplate(PageTemplate.Plain),
         paperColor = paperColor.takeIf { it in DEFAULT_PAPER_COLORS } ?: DEFAULT_PAPER_COLORS.first()
     )
@@ -515,9 +518,14 @@ fun List<SNote>.removeTagFromNotes(tag: String): List<SNote> {
 
 fun SharedPreferences.loadNoteDefaults(): NoteDefaults =
     noteDefaultsFromStoredValues(
+        kindName = getString(SETTING_DEFAULT_NOTE_KIND, NewNoteKind.Text.name),
         templateName = getString(SETTING_DEFAULT_PAGE_TEMPLATE, PageTemplate.Plain.name),
         paperColor = getLong(SETTING_DEFAULT_PAPER_COLOR, DEFAULT_PAPER_COLORS.first())
     )
+
+fun newNoteKindFromStoredValue(value: String?): NewNoteKind =
+    NewNoteKind.entries.firstOrNull { it.name.equals(value.orEmpty(), ignoreCase = true) }
+        ?: NewNoteKind.Text
 
 fun sortModeFromStoredValue(value: String?): NoteSortMode =
     NoteSortMode.entries.firstOrNull { it.name.equals(value.orEmpty(), ignoreCase = true) }
@@ -874,6 +882,11 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         persistSettings()
     }
 
+    fun setDefaultNoteKind(newNoteKind: NewNoteKind) {
+        _state.update { it.copy(noteDefaults = it.noteDefaults.copy(newNoteKind = newNoteKind)) }
+        persistSettings()
+    }
+
     fun setDefaultPaperColor(paperColor: Long) {
         _state.update { it.copy(noteDefaults = it.noteDefaults.copy(paperColor = paperColor)) }
         persistSettings()
@@ -883,6 +896,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         val state = _state.value
         settings.edit()
             .putBoolean(SETTING_DARK_MODE, state.darkMode)
+            .putString(SETTING_DEFAULT_NOTE_KIND, state.noteDefaults.newNoteKind.name)
             .putString(SETTING_DEFAULT_PAGE_TEMPLATE, state.noteDefaults.pageTemplate.name)
             .putLong(SETTING_DEFAULT_PAPER_COLOR, state.noteDefaults.paperColor)
             .putString(SETTING_NOTE_PIN_DIGEST, state.notePinDigest)
@@ -1356,6 +1370,15 @@ enum class NewNoteKind(val title: String) {
     Drawing("New sketch"),
     Meeting("Meeting note")
 }
+
+val NewNoteKind.settingsLabel: String
+    get() = when (this) {
+        NewNoteKind.Text -> "Text"
+        NewNoteKind.Checklist -> "Checklist"
+        NewNoteKind.Sticky -> "Sticky"
+        NewNoteKind.Drawing -> "Sketch"
+        NewNoteKind.Meeting -> "Meeting"
+    }
 
 fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()): SNote {
     val blocks = when (this) {
@@ -1859,9 +1882,9 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                text = { Text("New note") },
+                text = { Text(state.noteDefaults.newNoteKind.title) },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                onClick = { viewModel.createNote(NewNoteKind.Text) }
+                onClick = { viewModel.createNote(state.noteDefaults.newNoteKind) }
             )
         },
         bottomBar = {
@@ -2900,6 +2923,19 @@ fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: ()
                     if (state.hasNotePin) {
                         OutlinedButton(onClick = viewModel::clearNotesPin) {
                             Text("Remove PIN")
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Default note", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        NewNoteKind.entries.forEach { kind ->
+                            FilterChip(
+                                selected = state.noteDefaults.newNoteKind == kind,
+                                onClick = { viewModel.setDefaultNoteKind(kind) },
+                                label = { Text(kind.settingsLabel) }
+                            )
                         }
                     }
                 }
