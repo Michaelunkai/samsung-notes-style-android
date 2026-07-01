@@ -337,6 +337,36 @@ class NoteModelTest {
     }
 
     @Test
+    fun noteBlocksCanDuplicateAfterSourceWithFreshNestedIds() {
+        val note = SNote(
+            blocks = listOf(
+                NoteBlock.Text(id = "text", text = "Body"),
+                NoteBlock.Checklist(
+                    id = "list",
+                    items = listOf(CheckItem(id = "item", text = "Task"))
+                ),
+                NoteBlock.Drawing(
+                    id = "drawing",
+                    strokes = listOf(DrawStroke(id = "stroke", color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))
+                )
+            )
+        )
+
+        val withChecklistCopy = note.duplicateBlockAfter("list")
+        val checklistCopy = withChecklistCopy.blocks[2] as NoteBlock.Checklist
+        val withDrawingCopy = note.duplicateBlockAfter("drawing")
+        val drawingCopy = withDrawingCopy.blocks[3] as NoteBlock.Drawing
+
+        assertEquals(listOf("text", "list", checklistCopy.id, "drawing"), withChecklistCopy.blocks.map { it.id })
+        assertTrue(checklistCopy.id != "list")
+        assertEquals("Task", checklistCopy.items.single().text)
+        assertTrue(checklistCopy.items.single().id != "item")
+        assertTrue(drawingCopy.id != "drawing")
+        assertTrue(drawingCopy.strokes.single().id != "stroke")
+        assertEquals(note.blocks.map { it.id }, note.duplicateBlockAfter("missing").blocks.map { it.id })
+    }
+
+    @Test
     fun notePlainTextExportIncludesMixedContent() {
         val note = SNote(
             title = "Sprint review",

@@ -925,6 +925,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         updateNote(note.copy(blocks = note.blocks.filterNot { it.id == block.id }))
     }
 
+    fun duplicateBlock(note: SNote, block: NoteBlock) {
+        updateNote(note.duplicateBlockAfter(block.id))
+    }
+
     fun moveBlock(note: SNote, blockId: String, direction: Int) {
         updateNote(note.moveBlock(blockId, direction))
     }
@@ -1028,6 +1032,14 @@ fun NoteBlock.duplicateBlock(): NoteBlock = when (this) {
     )
     is NoteBlock.Attachment -> copy(id = UUID.randomUUID().toString())
     is NoteBlock.Audio -> copy(id = UUID.randomUUID().toString())
+}
+
+fun SNote.duplicateBlockAfter(blockId: String): SNote {
+    val index = blocks.indexOfFirst { it.id == blockId }
+    if (index < 0) return this
+    val updated = blocks.toMutableList()
+    updated.add(index + 1, blocks[index].duplicateBlock())
+    return copy(blocks = updated)
 }
 
 fun SNote.moveBlock(blockId: String, direction: Int): SNote {
@@ -2613,6 +2625,9 @@ fun TextBlockEditor(note: SNote, block: NoteBlock.Text, viewModel: NotesViewMode
                         }
                     }
                 }
+                IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                    Icon(Icons.Default.ContentCopy, "Duplicate text block")
+                }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete text block")
                 }
@@ -2694,6 +2709,9 @@ fun ChecklistBlockEditor(note: SNote, block: NoteBlock.Checklist, viewModel: Not
                 IconButton(onClick = {
                     viewModel.updateBlock(note, block.copy(items = block.items + CheckItem(text = "")))
                 }) { Icon(Icons.Default.Add, "Add item") }
+                IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                    Icon(Icons.Default.ContentCopy, "Duplicate checklist")
+                }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete checklist")
                 }
@@ -2795,6 +2813,9 @@ fun DrawingBlockEditor(note: SNote, block: NoteBlock.Drawing, viewModel: NotesVi
                 }
                 IconButton(onClick = { viewModel.updateBlock(note, block.copy(strokes = emptyList())) }) {
                     Icon(Icons.Default.FormatColorFill, "Clear drawing")
+                }
+                IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                    Icon(Icons.Default.ContentCopy, "Duplicate drawing")
                 }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete drawing")
@@ -3056,6 +3077,9 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
                 ) {
                     Icon(Icons.AutoMirrored.Filled.OpenInNew, "Open attachment")
                 }
+                IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                    Icon(Icons.Default.ContentCopy, "Duplicate attachment")
+                }
                 IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                     Icon(Icons.Default.Delete, "Delete attachment")
                 }
@@ -3165,6 +3189,9 @@ fun AudioBlock(note: SNote, block: NoteBlock.Audio, viewModel: NotesViewModel) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+            IconButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                Icon(Icons.Default.ContentCopy, "Duplicate audio")
             }
             IconButton(onClick = { viewModel.removeBlock(note, block) }) {
                 Icon(Icons.Default.Delete, "Delete audio")
