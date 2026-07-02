@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.5.8
+
+- Hardened multi-select lock removal so selected locked notes must already be unlocked in the current session before their lock can be removed.
+- Added status feedback when a batch unlock attempt targets only still-locked private notes.
+- Cleared session unlock markers after locks are removed from selected notes.
+- Added regression coverage for selection-state tracking of unlocked locked notes.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.7
 
 - Added character counts to the note details model and details dialog alongside existing word, page, block, checklist, ink, attachment, and audio summaries.

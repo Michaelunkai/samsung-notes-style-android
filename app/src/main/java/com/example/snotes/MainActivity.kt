@@ -676,6 +676,12 @@ data class NotesUiState(
     val selectedNotesIncludeUnarchived: Boolean
         get() = selectedNotes.any { !it.archived }
 
+    val selectedUnlockedLockedNoteIds: Set<String>
+        get() = selectedNotes
+            .filter { note -> note.locked && note.id in unlockedNoteIds }
+            .map { it.id }
+            .toSet()
+
     val lockedCount: Int
         get() = notes.count { !it.deleted && !it.archived && it.locked }
 
@@ -1263,11 +1269,29 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun batchLockSelected(locked: Boolean) {
-        if (locked && !_state.value.hasNotePin) {
+        val state = _state.value
+        if (locked && !state.hasNotePin) {
             _state.update { it.copy(statusMessage = "Set a Notes PIN in Settings first") }
             return
         }
-        updateSelectedNotes(if (locked) "Locked selected notes" else "Unlocked selected notes") { it.copy(locked = locked) }
+        if (!locked) {
+            val removableIds = state.selectedUnlockedLockedNoteIds
+            if (removableIds.isEmpty()) {
+                _state.update { it.copy(statusMessage = "Unlock notes before removing lock") }
+                return
+            }
+            _state.update { current ->
+                current.copy(
+                    notes = current.notes.map { note -> if (note.id in removableIds) note.copy(locked = false) else note },
+                    unlockedNoteIds = current.unlockedNoteIds - removableIds,
+                    selectedNoteIds = emptySet(),
+                    statusMessage = "Unlocked ${removableIds.size} note${if (removableIds.size == 1) "" else "s"}"
+                )
+            }
+            persist()
+            return
+        }
+        updateSelectedNotes("Locked selected notes") { it.copy(locked = true) }
     }
 
     fun batchMoveSelectedToFolder(folder: String) {
