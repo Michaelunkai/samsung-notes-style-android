@@ -2121,6 +2121,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onSetReminderTomorrow = { viewModel.updateReminder(note, reminderPresetTimestamp(1)) },
+                            onClearReminder = { viewModel.updateReminder(note, null) },
                             onToggleLock = {
                                 if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
                             },
@@ -2161,6 +2163,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onSetReminderTomorrow = { viewModel.updateReminder(note, reminderPresetTimestamp(1)) },
+                            onClearReminder = { viewModel.updateReminder(note, null) },
                             onToggleLock = {
                                 if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
                             },
@@ -2499,6 +2503,8 @@ fun NoteCard(
     onDuplicate: () -> Unit,
     onTogglePinned: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onSetReminderTomorrow: () -> Unit,
+    onClearReminder: () -> Unit,
     onToggleLock: () -> Unit,
     onMoveToTrash: () -> Unit,
     onRestore: () -> Unit,
@@ -2593,6 +2599,14 @@ fun NoteCard(
                                 onClick = {
                                     menuOpen = false
                                     onToggleFavorite()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (note.reminderAt == null) "Remind tomorrow" else "Clear reminder") },
+                                leadingIcon = { Icon(Icons.Default.Notifications, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    if (note.reminderAt == null) onSetReminderTomorrow() else onClearReminder()
                                 }
                             )
                             if (note.locked) {
