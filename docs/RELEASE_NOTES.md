@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.5.10
+
+- Added multi-select HTML export through Android's document picker.
+- Added a multi-note HTML bundle renderer that preserves note separation, paper colors, metadata, tags, rich text styling, checklist state, sticky notes, and escaped content.
+- Reused the existing selected-note privacy filter so locked notes are included only when already unlocked in the current session.
+- Added regression coverage for multi-note HTML bundle structure and escaping.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.9
 
 - Added multi-select TXT export through Android's document picker.

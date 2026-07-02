@@ -861,6 +861,40 @@ class NoteModelTest {
     }
 
     @Test
+    fun multipleNotesHtmlBundlePreservesStructureAndEscapesContent() {
+        val notes = listOf(
+            SNote(
+                title = "First <note>",
+                folder = "Work & Planning",
+                tags = listOf("team"),
+                paperColor = 0xFFFFFBF0,
+                blocks = listOf(NoteBlock.Text(text = "Alpha <body>", bold = true))
+            ),
+            SNote(
+                title = "Second",
+                tags = listOf("shared"),
+                blocks = listOf(
+                    NoteBlock.Checklist(items = listOf(CheckItem(text = "Beta & ship"))),
+                    NoteBlock.Sticky(text = "Remember <this>")
+                )
+            )
+        )
+
+        val html = notes.toHtmlDocumentBundle()
+
+        assertTrue(html.contains("<title>2 exported notes</title>"))
+        assertEquals(2, Regex("""<article class="note-page"""").findAll(html).count())
+        assertTrue(html.contains("First &lt;note&gt;"))
+        assertTrue(html.contains("Folder: Work &amp; Planning"))
+        assertTrue(html.contains("style=\"background: #FFFBF0\""))
+        assertTrue(html.contains("Alpha &lt;body&gt;"))
+        assertTrue(html.contains("font-weight: 700"))
+        assertTrue(html.contains("#shared"))
+        assertTrue(html.contains("☐ Beta &amp; ship"))
+        assertTrue(html.contains("Remember &lt;this&gt;"))
+    }
+
+    @Test
     fun reminderNotificationCopyHidesLockedNoteContent() {
         val unlocked = SNote(title = "Untitled note", blocks = listOf(NoteBlock.Text(text = "Dentist appointment")))
         val locked = SNote(title = "Private plan", locked = true)

@@ -1785,6 +1785,52 @@ fun SNote.toHtmlDocument(): String {
     """.trimIndent()
 }
 
+fun List<SNote>.toHtmlDocumentBundle(): String {
+    val bodyColor = cssColor(0xFF2B2A27)
+    val notesHtml = joinToString("\n") { note ->
+        val tagHtml = note.tags.joinToString(" ") { """<span class="tag">#${it.escapeHtml()}</span>""" }
+        val reminderHtml = note.reminderLabel()?.let { """<p class="meta">${it.escapeHtml()}</p>""" }.orEmpty()
+        val blocksHtml = note.blocks.joinToString("\n") { it.toHtml() }
+        """
+          <article class="note-page" style="background: ${cssColor(note.paperColor)}">
+            <h1>${note.displayTitle().escapeHtml()}</h1>
+            <p class="meta">Folder: ${note.folder.escapeHtml()}</p>
+            <p class="meta">${note.pageStyleLabel().escapeHtml()}</p>
+            ${if (tagHtml.isNotBlank()) """<p class="meta">$tagHtml</p>""" else ""}
+            $reminderHtml
+            $blocksHtml
+          </article>
+        """.trimIndent()
+    }
+    return """
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${size} exported notes</title>
+          <style>
+            body { margin: 0; background: #f6f2e9; color: $bodyColor; font-family: Arial, sans-serif; }
+            .note-page { max-width: 820px; min-height: 60vh; margin: 24px auto; padding: 40px; box-sizing: border-box; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+            h1 { margin: 0 0 8px; font-size: 30px; }
+            .meta { margin: 4px 0; color: #635f55; font-size: 13px; }
+            .tag { display: inline-block; margin: 4px 6px 4px 0; padding: 3px 8px; border-radius: 999px; background: #efe6d0; font-size: 12px; }
+            .block { margin-top: 18px; }
+            .text-block { white-space: pre-wrap; line-height: 1.45; }
+            .checklist { padding-left: 0; list-style: none; }
+            .checklist li { margin: 8px 0; }
+            .sticky { padding: 14px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.12); white-space: pre-wrap; }
+            .media { padding: 12px 14px; border: 1px solid #ded6c6; border-radius: 10px; background: rgba(255,255,255,.45); }
+            .page-break { margin: 28px 0; padding-top: 10px; border-top: 2px dashed #c9bfae; color: #635f55; font-size: 12px; text-align: center; }
+            .markers { margin: 8px 0 0 18px; color: #635f55; }
+          </style>
+        </head>
+        <body>
+        $notesHtml
+        </body>
+        </html>
+    """.trimIndent()
+}
+
 fun SNote.details(): NoteDetails = NoteDetails(
     blockCount = blocks.size,
     pageBreaks = blocks.count { it is NoteBlock.PageBreak },
@@ -2688,6 +2734,7 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
     var tagDialogOpen by remember { mutableStateOf(false) }
     var removeTagDialogOpen by remember { mutableStateOf(false) }
     var pendingSelectedExportText by remember { mutableStateOf<String?>(null) }
+    var pendingSelectedHtmlExportText by remember { mutableStateOf<String?>(null) }
     val shareableSelectedNotes = state.selectedNotes.filter { note -> !note.locked || note.id in state.unlockedNoteIds }
     val selectedExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
         if (uri == null) {
@@ -2703,6 +2750,21 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             viewModel.setStatus("Selected note export failed")
         }
         pendingSelectedExportText = null
+    }
+    val selectedHtmlExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri: Uri? ->
+        if (uri == null) {
+            pendingSelectedHtmlExportText = null
+            return@rememberLauncherForActivityResult
+        }
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(pendingSelectedHtmlExportText.orEmpty().toByteArray())
+            } ?: error("Unable to open selected-note HTML export destination")
+            viewModel.setStatus("Selected notes exported as HTML")
+        }.onFailure {
+            viewModel.setStatus("Selected note HTML export failed")
+        }
+        pendingSelectedHtmlExportText = null
     }
     if (moveDialogOpen) {
         BatchTextActionDialog(
@@ -2773,6 +2835,20 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             Icon(Icons.Default.Description, contentDescription = null)
             Spacer(Modifier.width(6.dp))
             Text("Export TXT")
+        }
+        Button(
+            onClick = {
+                if (shareableSelectedNotes.isEmpty()) {
+                    viewModel.setStatus("Unlock notes before exporting")
+                } else {
+                    pendingSelectedHtmlExportText = shareableSelectedNotes.toHtmlDocumentBundle()
+                    selectedHtmlExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.html")
+                }
+            }
+        ) {
+            Icon(Icons.Default.Description, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text("Export HTML")
         }
         if (state.surface == NotesSurface.Trash) {
             Button(onClick = viewModel::batchRestoreSelected) {
