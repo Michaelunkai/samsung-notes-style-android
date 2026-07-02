@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.5.0
+
+- Added page-break blocks to the note editor so notes can be structured into lightweight pages while keeping existing text, checklist, sticky, handwriting, attachment, and audio blocks intact.
+- Added a toolbar page-break action, editor page dividers with duplicate/remove controls, card page-count metadata, and Note Details page counts.
+- Preserved page breaks through JSON backup/import, Room block payloads, note duplication, plain text export, rich HTML export, and PDF-line export.
+- Added regression coverage for page-break serialization, duplication, details counts, and export output.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.9
 
 - Kept archived notes out of the home-screen widget's latest-note preview and library status counts so Archive behaves like a hidden main-library surface.

@@ -65,6 +65,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -86,7 +87,6 @@ import androidx.compose.material.icons.filled.FormatAlignCenter
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
@@ -349,6 +349,10 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         val durationHintMs: Long = 0L,
         val markers: List<AudioMarker> = emptyList()
     ) : NoteBlock(id, "Audio")
+
+    data class PageBreak(
+        override val id: String = UUID.randomUUID().toString()
+    ) : NoteBlock(id, "Page break")
 }
 
 data class CheckItem(
@@ -370,6 +374,7 @@ data class AudioMarker(
 
 data class NoteDetails(
     val blockCount: Int,
+    val pageBreaks: Int,
     val wordCount: Int,
     val checklistItems: Int,
     val completedChecklistItems: Int,
@@ -381,6 +386,9 @@ data class NoteDetails(
 ) {
     val blockLabel: String
         get() = "$blockCount block${if (blockCount == 1) "" else "s"}"
+
+    val pageLabel: String
+        get() = "${pageBreaks + 1} page${if (pageBreaks == 0) "" else "s"}"
 
     val wordLabel: String
         get() = "$wordCount word${if (wordCount == 1) "" else "s"}"
@@ -1669,6 +1677,7 @@ fun NoteBlock.duplicateBlock(): NoteBlock = when (this) {
         id = UUID.randomUUID().toString(),
         markers = markers.map { it.copy(id = UUID.randomUUID().toString()) }
     )
+    is NoteBlock.PageBreak -> copy(id = UUID.randomUUID().toString())
 }
 
 fun SNote.duplicateBlockAfter(blockId: String): SNote {
@@ -1728,6 +1737,7 @@ fun SNote.toHtmlDocument(): String {
             .checklist li { margin: 8px 0; }
             .sticky { padding: 14px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.12); white-space: pre-wrap; }
             .media { padding: 12px 14px; border: 1px solid #ded6c6; border-radius: 10px; background: rgba(255,255,255,.45); }
+            .page-break { margin: 28px 0; padding-top: 10px; border-top: 2px dashed #c9bfae; color: #635f55; font-size: 12px; text-align: center; }
             .markers { margin: 8px 0 0 18px; color: #635f55; }
           </style>
         </head>
@@ -1747,6 +1757,7 @@ fun SNote.toHtmlDocument(): String {
 
 fun SNote.details(): NoteDetails = NoteDetails(
     blockCount = blocks.size,
+    pageBreaks = blocks.count { it is NoteBlock.PageBreak },
     wordCount = blocks.filterIsInstance<NoteBlock.Text>().sumOf { block ->
         block.text.split(Regex("""\s+""")).count { it.isNotBlank() }
     } + blocks.filterIsInstance<NoteBlock.Sticky>().sumOf { sticky ->
@@ -1767,7 +1778,12 @@ fun SNote.pageStyleLabel(): String =
     "Page style: ${pageTemplate.label}, paper ${cssColor(paperColor)}"
 
 fun SNote.cardMetaLabel(): String =
-    "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • $folder"
+    "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • ${pageCountLabel()} • $folder"
+
+fun SNote.pageCountLabel(): String {
+    val pages = blocks.count { it is NoteBlock.PageBreak } + 1
+    return "$pages page${if (pages == 1) "" else "s"}"
+}
 
 fun SNote.checklistTotalCount(): Int =
     blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size }
@@ -1903,6 +1919,7 @@ fun NoteBlock.toPlainText(): String = when (this) {
             append("- ${formatDuration(marker.timestampMs)} ${marker.label}")
         }
     }
+    is NoteBlock.PageBreak -> "[Page break]"
 }
 
 fun NoteBlock.toHtml(): String = when (this) {
@@ -1940,6 +1957,7 @@ fun NoteBlock.toHtml(): String = when (this) {
         }.orEmpty()
         """<section class="block media">Audio: ${name.escapeHtml()}${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { " (${it.escapeHtml()})" }.orEmpty()}$markersHtml</section>"""
     }
+    is NoteBlock.PageBreak -> """<section class="page-break">Page break</section>"""
 }
 
 fun String.escapeHtml(): String =
@@ -3115,6 +3133,7 @@ fun BlockBadges(blocks: List<NoteBlock>) {
         if (blocks.any { it is NoteBlock.Drawing }) Icon(Icons.Default.Brush, "Drawing", modifier = Modifier.size(18.dp))
         if (blocks.any { it is NoteBlock.Checklist }) Icon(Icons.Default.CheckBox, "Checklist", modifier = Modifier.size(18.dp))
         if (blocks.any { it is NoteBlock.Sticky }) Icon(Icons.Default.Description, "Sticky note", modifier = Modifier.size(18.dp))
+        if (blocks.any { it is NoteBlock.PageBreak }) Icon(Icons.AutoMirrored.Filled.FormatListBulleted, "Page breaks", modifier = Modifier.size(18.dp))
         if (blocks.any { it is NoteBlock.Attachment }) Icon(Icons.Default.AttachFile, "Attachment", modifier = Modifier.size(18.dp))
         if (blocks.any { it is NoteBlock.Audio }) Icon(Icons.Default.AudioFile, "Audio", modifier = Modifier.size(18.dp))
     }
@@ -3359,6 +3378,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                 onAddChecklist = { viewModel.addBlock(note, NoteBlock.Checklist()) },
                 onAddSticky = { viewModel.addBlock(note, NoteBlock.Sticky()) },
                 onAddDrawing = { viewModel.addBlock(note, NoteBlock.Drawing()) },
+                onAddPageBreak = { viewModel.addBlock(note, NoteBlock.PageBreak()) },
                 onAddAttachment = { attachmentLauncher.launch(arrayOf("*/*")) },
                 onCaptureImage = {
                     val target = createCameraCaptureTarget(context)
@@ -3470,6 +3490,12 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                             is NoteBlock.Drawing -> DrawingBlockEditor(note, block, viewModel)
                             is NoteBlock.Attachment -> AttachmentBlock(note, block, viewModel)
                             is NoteBlock.Audio -> AudioBlock(note, block, viewModel)
+                            is NoteBlock.PageBreak -> PageBreakBlock(
+                                note = note,
+                                block = block,
+                                pageNumber = note.blocks.take(index + 1).count { it is NoteBlock.PageBreak } + 1,
+                                viewModel = viewModel
+                            )
                         }
                     }
                 }
@@ -3651,6 +3677,7 @@ fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
                 DetailRow("Created", formatTimestamp(note.createdAt))
                 DetailRow("Modified", formatTimestamp(note.updatedAt))
                 DetailRow("Blocks", details.blockLabel)
+                DetailRow("Pages", details.pageLabel)
                 DetailRow("Words", details.wordLabel)
                 DetailRow("Checklist", details.checklistLabel)
                 DetailRow("Sticky notes", details.stickyNotes.toString())
@@ -3843,6 +3870,7 @@ fun EditorToolbar(
     onAddChecklist: () -> Unit,
     onAddSticky: () -> Unit,
     onAddDrawing: () -> Unit,
+    onAddPageBreak: () -> Unit,
     onAddAttachment: () -> Unit,
     onCaptureImage: () -> Unit,
     onRecord: () -> Unit
@@ -3859,10 +3887,41 @@ fun EditorToolbar(
             IconButton(onClick = onAddChecklist) { Icon(Icons.Default.CheckBox, "Checklist") }
             IconButton(onClick = onAddSticky) { Icon(Icons.Default.Description, "Sticky note") }
             IconButton(onClick = onAddDrawing) { Icon(Icons.Default.Brush, "Handwriting") }
+            IconButton(onClick = onAddPageBreak) { Icon(Icons.AutoMirrored.Filled.FormatListBulleted, "Page break") }
             IconButton(onClick = onAddAttachment) { Icon(Icons.Default.AttachFile, "Attachment") }
             IconButton(onClick = onCaptureImage) { Icon(Icons.Default.CameraAlt, "Capture image") }
             FilledIconButton(onClick = onRecord) {
                 Icon(Icons.Default.Mic, if (isRecording) "Stop recording" else "Record audio")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun PageBreakBlock(note: SNote, block: NoteBlock.PageBreak, pageNumber: Int, viewModel: NotesViewModel) {
+    Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    "Page $pageNumber",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = { viewModel.duplicateBlock(note, block) }) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Duplicate")
+                }
+                OutlinedButton(onClick = { viewModel.removeBlock(note, block) }) {
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Remove")
+                }
             }
         }
     }
@@ -4579,7 +4638,11 @@ fun String.safeLocalFileName(): String =
 fun NoteBlock.localFileReference(packageName: String): LocalFileReference? = when (this) {
     is NoteBlock.Attachment -> uri.localFileReference(packageName)
     is NoteBlock.Audio -> path.localFileReference(packageName)
-    else -> null
+    is NoteBlock.Text,
+    is NoteBlock.Checklist,
+    is NoteBlock.Sticky,
+    is NoteBlock.Drawing,
+    is NoteBlock.PageBreak -> null
 }
 
 fun String.localFileReference(packageName: String): LocalFileReference? = runCatching {
@@ -4847,8 +4910,8 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
                 is NoteBlock.Sticky -> if (block.text.contains(normalized, ignoreCase = true)) {
                     add(EditorSearchMatch(block.id, "Sticky note", block.text.searchSnippet(normalized)))
                 }
-        is NoteBlock.Attachment -> if (
-            block.name.contains(normalized, ignoreCase = true) ||
+                is NoteBlock.Attachment -> if (
+                    block.name.contains(normalized, ignoreCase = true) ||
                     block.mimeHint.contains(normalized, ignoreCase = true) ||
                     block.pageCountLabel.contains(normalized, ignoreCase = true) ||
                     block.caption.contains(normalized, ignoreCase = true)
@@ -4874,6 +4937,7 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
                         }
                 }
                 is NoteBlock.Drawing -> Unit
+                is NoteBlock.PageBreak -> Unit
             }
         }
     }
@@ -5191,6 +5255,9 @@ fun NoteBlock.toJson(): JSONObject {
                     )
                 }
             })
+
+        is NoteBlock.PageBreak -> json
+            .put("type", "pageBreak")
     }
 }
 
@@ -5270,6 +5337,10 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         name = optString("name", "Recording"),
         durationHintMs = optLong("durationHintMs", 0L),
         markers = optJSONArray("markers").toAudioMarkers()
+    )
+
+    "pageBreak" -> NoteBlock.PageBreak(
+        id = optString("id", UUID.randomUUID().toString())
     )
 
     else -> NoteBlock.Text(

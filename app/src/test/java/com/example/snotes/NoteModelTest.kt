@@ -59,7 +59,8 @@ class NoteModelTest {
                     path = "/recordings/one.m4a",
                     name = "one.m4a",
                     markers = listOf(AudioMarker(id = "marker", label = "Decision point", timestampMs = 12_000))
-                )
+                ),
+                NoteBlock.PageBreak(id = "page")
             )
         )
 
@@ -74,7 +75,7 @@ class NoteModelTest {
         assertEquals(1_700_000_000_000, restored.reminderAt)
         assertEquals(PageTemplate.Cornell, restored.pageTemplate)
         assertEquals(0xFFEFF6FF, restored.paperColor)
-        assertEquals(6, restored.blocks.size)
+        assertEquals(7, restored.blocks.size)
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
         assertTrue((restored.blocks[0] as NoteBlock.Text).bold)
         assertTrue((restored.blocks[0] as NoteBlock.Text).underline)
@@ -94,6 +95,7 @@ class NoteModelTest {
         assertEquals("one.m4a", (restored.blocks[5] as NoteBlock.Audio).name)
         assertEquals("Decision point", (restored.blocks[5] as NoteBlock.Audio).markers.single().label)
         assertEquals(12_000, (restored.blocks[5] as NoteBlock.Audio).markers.single().timestampMs)
+        assertTrue(restored.blocks[6] is NoteBlock.PageBreak)
     }
 
     @Test
@@ -528,7 +530,8 @@ class NoteModelTest {
                     path = "/audio/brief.m4a",
                     name = "brief.m4a",
                     markers = listOf(AudioMarker(id = "marker", label = "Decision", timestampMs = 3_000))
-                )
+                ),
+                NoteBlock.PageBreak(id = "page")
             )
         )
 
@@ -549,6 +552,8 @@ class NoteModelTest {
         assertTrue((duplicate.blocks[1] as NoteBlock.Checklist).items.single().id != "item")
         assertTrue((duplicate.blocks[2] as NoteBlock.Drawing).strokes.single().id != "stroke")
         assertTrue((duplicate.blocks[3] as NoteBlock.Audio).markers.single().id != "marker")
+        assertTrue(duplicate.blocks[4].id != "page")
+        assertTrue(duplicate.blocks[4] is NoteBlock.PageBreak)
     }
 
     @Test
@@ -689,7 +694,8 @@ class NoteModelTest {
                     name = "review.m4a",
                     durationHintMs = 65_000,
                     markers = listOf(AudioMarker(label = "Stakeholder question", timestampMs = 12_000))
-                )
+                ),
+                NoteBlock.PageBreak()
             )
         )
 
@@ -708,6 +714,7 @@ class NoteModelTest {
         assertTrue(text.contains("Caption: Board review packet"))
         assertTrue(text.contains("[Audio: review.m4a, 1:05]"))
         assertTrue(text.contains("- 0:12 Stakeholder question"))
+        assertTrue(text.contains("[Page break]"))
     }
 
     @Test
@@ -751,7 +758,8 @@ class NoteModelTest {
                     name = "review.m4a",
                     durationHintMs = 65_000,
                     markers = listOf(AudioMarker(label = "Question <risk>", timestampMs = 12_000))
-                )
+                ),
+                NoteBlock.PageBreak()
             )
         )
 
@@ -778,6 +786,7 @@ class NoteModelTest {
         assertTrue(html.contains("Board &lt;packet&gt;"))
         assertTrue(html.contains("Audio: review.m4a (1:05)"))
         assertTrue(html.contains("0:12 Question &lt;risk&gt;"))
+        assertTrue(html.contains("class=\"page-break\""))
     }
 
     @Test
@@ -809,13 +818,15 @@ class NoteModelTest {
                     path = "/audio/review.m4a",
                     name = "review.m4a",
                     markers = listOf(AudioMarker(label = "Intro", timestampMs = 5_000))
-                )
+                ),
+                NoteBlock.PageBreak()
             )
         )
 
         val details = note.details()
 
-        assertEquals(6, details.blockCount)
+        assertEquals(7, details.blockCount)
+        assertEquals(1, details.pageBreaks)
         assertEquals(6, details.wordCount)
         assertEquals(2, details.checklistItems)
         assertEquals(1, details.completedChecklistItems)
@@ -824,7 +835,8 @@ class NoteModelTest {
         assertEquals(1, details.attachments)
         assertEquals(1, details.audioBlocks)
         assertEquals(1, details.audioMarkers)
-        assertEquals("6 blocks", details.blockLabel)
+        assertEquals("7 blocks", details.blockLabel)
+        assertEquals("2 pages", details.pageLabel)
         assertEquals("6 words", details.wordLabel)
         assertEquals("1/2 done", details.checklistLabel)
         assertEquals("1 stroke", details.inkLabel)
@@ -837,6 +849,7 @@ class NoteModelTest {
         val details = SNote(blocks = listOf(NoteBlock.Text(text = ""))).details()
 
         assertEquals("1 block", details.blockLabel)
+        assertEquals("1 page", details.pageLabel)
         assertEquals("0 words", details.wordLabel)
         assertEquals("No checklist items", details.checklistLabel)
         assertEquals("No ink strokes", details.inkLabel)
@@ -926,6 +939,7 @@ class NoteModelTest {
             paperColor = 0xFFEFF6FF,
             blocks = listOf(
                 NoteBlock.Text(text = "alpha beta gamma delta epsilon"),
+                NoteBlock.PageBreak(),
                 NoteBlock.Checklist(items = listOf(CheckItem(text = "send file", checked = true)))
             )
         )
@@ -940,6 +954,7 @@ class NoteModelTest {
         assertTrue(lines.contains("alpha beta"))
         assertTrue(lines.contains("gamma delta"))
         assertTrue(lines.contains("epsilon"))
+        assertTrue(lines.contains("[Page break]"))
         assertTrue(lines.contains("- [x] send"))
         assertTrue(lines.contains("file"))
         assertTrue(lines.filter { it.isNotBlank() && !it.contains("#") }.all { it.length <= 14 })
