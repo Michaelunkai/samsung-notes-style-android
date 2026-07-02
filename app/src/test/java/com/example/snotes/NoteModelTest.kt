@@ -656,6 +656,66 @@ class NoteModelTest {
     }
 
     @Test
+    fun noteHtmlExportPreservesRichStructureAndEscapesContent() {
+        val note = SNote(
+            title = "Sprint <review>",
+            folder = "Work & Planning",
+            tags = listOf("team", "export"),
+            paperColor = 0xFFFFFBF0,
+            reminderAt = 1_704_067_200_000,
+            blocks = listOf(
+                NoteBlock.Text(
+                    text = "Release <summary>",
+                    bold = true,
+                    italic = true,
+                    underline = true,
+                    color = 0xFF123456,
+                    highlight = 0xFFFFEE99,
+                    sizeSp = 22,
+                    fontFamily = NoteFontFamily.Serif,
+                    alignment = TextAlignment.Center
+                ),
+                NoteBlock.Checklist(
+                    items = listOf(
+                        CheckItem(text = "Demo & ship", checked = true),
+                        CheckItem(text = "Follow up", checked = false)
+                    )
+                ),
+                NoteBlock.Sticky(text = "Remember stakeholders", color = 0xFFFFF59D),
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
+                NoteBlock.Audio(
+                    path = "/audio/review.m4a",
+                    name = "review.m4a",
+                    durationHintMs = 65_000,
+                    markers = listOf(AudioMarker(label = "Question <risk>", timestampMs = 12_000))
+                )
+            )
+        )
+
+        val html = note.toHtmlDocument()
+
+        assertTrue(html.contains("<!doctype html>"))
+        assertTrue(html.contains("Sprint &lt;review&gt;"))
+        assertTrue(html.contains("Folder: Work &amp; Planning"))
+        assertTrue(html.contains("#team"))
+        assertTrue(html.contains("Overdue"))
+        assertTrue(html.contains("Release &lt;summary&gt;"))
+        assertTrue(html.contains("font-weight: 700"))
+        assertTrue(html.contains("font-style: italic"))
+        assertTrue(html.contains("text-decoration: underline"))
+        assertTrue(html.contains("color: #123456"))
+        assertTrue(html.contains("background: #FFEE99"))
+        assertTrue(html.contains("font-family: Georgia, serif"))
+        assertTrue(html.contains("text-align: center"))
+        assertTrue(html.contains("☑ Demo &amp; ship"))
+        assertTrue(html.contains("☐ Follow up"))
+        assertTrue(html.contains("Remember stakeholders"))
+        assertTrue(html.contains("Attachment: brief.pdf (2 KB)"))
+        assertTrue(html.contains("Audio: review.m4a (1:05)"))
+        assertTrue(html.contains("0:12 Question &lt;risk&gt;"))
+    }
+
+    @Test
     fun noteDetailsSummarizeMixedContentCounts() {
         val note = SNote(
             blocks = listOf(

@@ -1550,6 +1550,46 @@ fun SNote.toPlainText(): String = buildString {
     }
 }.trim()
 
+fun SNote.toHtmlDocument(): String {
+    val bodyColor = cssColor(0xFF2B2A27)
+    val pageColor = cssColor(paperColor)
+    val tagHtml = tags.joinToString(" ") { """<span class="tag">#${it.escapeHtml()}</span>""" }
+    val reminderHtml = reminderLabel()?.let { """<p class="meta">${it.escapeHtml()}</p>""" }.orEmpty()
+    val blocksHtml = blocks.joinToString("\n") { it.toHtml() }
+    return """
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${title.escapeHtml()}</title>
+          <style>
+            body { margin: 0; background: #f6f2e9; color: $bodyColor; font-family: Arial, sans-serif; }
+            main { max-width: 820px; margin: 0 auto; min-height: 100vh; padding: 40px; background: $pageColor; box-sizing: border-box; }
+            h1 { margin: 0 0 8px; font-size: 30px; }
+            .meta { margin: 4px 0; color: #635f55; font-size: 13px; }
+            .tag { display: inline-block; margin: 4px 6px 4px 0; padding: 3px 8px; border-radius: 999px; background: #efe6d0; font-size: 12px; }
+            .block { margin-top: 18px; }
+            .text-block { white-space: pre-wrap; line-height: 1.45; }
+            .checklist { padding-left: 0; list-style: none; }
+            .checklist li { margin: 8px 0; }
+            .sticky { padding: 14px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.12); white-space: pre-wrap; }
+            .media { padding: 12px 14px; border: 1px solid #ded6c6; border-radius: 10px; background: rgba(255,255,255,.45); }
+            .markers { margin: 8px 0 0 18px; color: #635f55; }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>${title.escapeHtml()}</h1>
+            <p class="meta">Folder: ${folder.escapeHtml()}</p>
+            ${if (tagHtml.isNotBlank()) """<p class="meta">$tagHtml</p>""" else ""}
+            $reminderHtml
+            $blocksHtml
+          </main>
+        </body>
+        </html>
+    """.trimIndent()
+}
+
 fun SNote.details(): NoteDetails = NoteDetails(
     blockCount = blocks.size,
     wordCount = blocks.filterIsInstance<NoteBlock.Text>().sumOf { block ->
@@ -1661,6 +1701,61 @@ fun NoteBlock.toPlainText(): String = when (this) {
             append("- ${formatDuration(marker.timestampMs)} ${marker.label}")
         }
     }
+}
+
+fun NoteBlock.toHtml(): String = when (this) {
+    is NoteBlock.Text -> {
+        val styles = buildList {
+            add("color: ${cssColor(color)}")
+            if (highlight ushr 24 != 0L) add("background: ${cssColor(highlight)}")
+            add("font-size: ${sizeSp}px")
+            add("text-align: ${alignment.cssTextAlign()}")
+            fontFamily.cssFontFamily()?.let { add("font-family: $it") }
+            if (bold) add("font-weight: 700")
+            if (italic) add("font-style: italic")
+            if (underline) add("text-decoration: underline")
+        }.joinToString("; ")
+        """<section class="block text-block" style="$styles">${text.ifBlank { " " }.escapeHtml()}</section>"""
+    }
+    is NoteBlock.Checklist -> {
+        val itemsHtml = items.joinToString("\n") { item ->
+            val marker = if (item.checked) "☑" else "☐"
+            """<li>$marker ${item.text.ifBlank { "Checklist item" }.escapeHtml()}</li>"""
+        }
+        """<section class="block"><ul class="checklist">$itemsHtml</ul></section>"""
+    }
+    is NoteBlock.Sticky -> """<section class="block sticky" style="background: ${cssColor(color)}">${text.ifBlank { "Empty sticky note" }.escapeHtml()}</section>"""
+    is NoteBlock.Drawing -> """<section class="block media">Handwriting: ${strokes.size} stroke${if (strokes.size == 1) "" else "s"}</section>"""
+    is NoteBlock.Attachment -> """<section class="block media">Attachment: ${name.escapeHtml()}${sizeLabel.takeIf { it.isNotBlank() }?.let { " (${it.escapeHtml()})" }.orEmpty()}</section>"""
+    is NoteBlock.Audio -> {
+        val markersHtml = markers.takeIf { it.isNotEmpty() }?.joinToString("\n", prefix = """<ul class="markers">""", postfix = "</ul>") { marker ->
+            """<li>${formatDuration(marker.timestampMs).escapeHtml()} ${marker.label.escapeHtml()}</li>"""
+        }.orEmpty()
+        """<section class="block media">Audio: ${name.escapeHtml()}${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { " (${it.escapeHtml()})" }.orEmpty()}$markersHtml</section>"""
+    }
+}
+
+fun String.escapeHtml(): String =
+    replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;")
+
+fun cssColor(argb: Long): String = "#${(argb and 0xFFFFFF).toString(16).padStart(6, '0').uppercase(Locale.ROOT)}"
+
+fun TextAlignment.cssTextAlign(): String = when (this) {
+    TextAlignment.Start -> "left"
+    TextAlignment.Center -> "center"
+    TextAlignment.End -> "right"
+}
+
+fun NoteFontFamily.cssFontFamily(): String? = when (this) {
+    NoteFontFamily.Default -> null
+    NoteFontFamily.Sans -> "Arial, sans-serif"
+    NoteFontFamily.Serif -> "Georgia, serif"
+    NoteFontFamily.Mono -> "\"Courier New\", monospace"
+    NoteFontFamily.Cursive -> "\"Comic Sans MS\", cursive"
 }
 
 val NoteBlock.importedName: String?
@@ -2803,6 +2898,18 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             viewModel.setStatus("Note export failed")
         }
     }
+    val noteHtmlExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                writer.write(pendingNoteExportText)
+            } ?: error("Unable to open HTML export destination")
+        }.onSuccess {
+            viewModel.setStatus("HTML exported")
+        }.onFailure {
+            viewModel.setStatus("HTML export failed")
+        }
+    }
     val notePdfExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         val exportNote = pendingPdfExportNote ?: note
@@ -2871,6 +2978,14 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                         }
                     ) {
                         Icon(Icons.Default.Description, contentDescription = "Export note")
+                    }
+                    IconButton(
+                        onClick = {
+                            pendingNoteExportText = note.toHtmlDocument()
+                            noteHtmlExportLauncher.launch("${note.title.sanitizeFileName()}.html")
+                        }
+                    ) {
+                        Icon(Icons.Default.Description, contentDescription = "Export HTML")
                     }
                     IconButton(
                         onClick = {
