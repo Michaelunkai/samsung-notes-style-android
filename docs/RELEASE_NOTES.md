@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.9
+
+- Added multi-select TXT export through Android's document picker.
+- Reused the selected-notes plain-text bundle format for saved exports so shared and saved selected-note output stay consistent.
+- Preserved locked-note privacy by exporting only selected notes that are public or already unlocked in the current session.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.8
 
 - Hardened multi-select lock removal so selected locked notes must already be unlocked in the current session before their lock can be removed.

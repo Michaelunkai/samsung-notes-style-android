@@ -2687,7 +2687,23 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
     var moveDialogOpen by remember { mutableStateOf(false) }
     var tagDialogOpen by remember { mutableStateOf(false) }
     var removeTagDialogOpen by remember { mutableStateOf(false) }
+    var pendingSelectedExportText by remember { mutableStateOf<String?>(null) }
     val shareableSelectedNotes = state.selectedNotes.filter { note -> !note.locked || note.id in state.unlockedNoteIds }
+    val selectedExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
+        if (uri == null) {
+            pendingSelectedExportText = null
+            return@rememberLauncherForActivityResult
+        }
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(pendingSelectedExportText.orEmpty().toByteArray())
+            } ?: error("Unable to open selected-note export destination")
+            viewModel.setStatus("Selected notes exported")
+        }.onFailure {
+            viewModel.setStatus("Selected note export failed")
+        }
+        pendingSelectedExportText = null
+    }
     if (moveDialogOpen) {
         BatchTextActionDialog(
             title = "Move to folder",
@@ -2743,6 +2759,20 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             Icon(Icons.Default.Share, contentDescription = null)
             Spacer(Modifier.width(6.dp))
             Text("Share")
+        }
+        Button(
+            onClick = {
+                if (shareableSelectedNotes.isEmpty()) {
+                    viewModel.setStatus("Unlock notes before exporting")
+                } else {
+                    pendingSelectedExportText = shareableSelectedNotes.toPlainTextBundle()
+                    selectedExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.txt")
+                }
+            }
+        ) {
+            Icon(Icons.Default.Description, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text("Export TXT")
         }
         if (state.surface == NotesSurface.Trash) {
             Button(onClick = viewModel::batchRestoreSelected) {
