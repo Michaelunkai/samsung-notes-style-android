@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.5.12
+
+- Grouped selected-note TXT and HTML export actions under a single Export menu to reduce multi-select toolbar clutter.
+- Kept the existing privacy-aware export behavior and skipped-locked-note status feedback.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.11
 
 - Added shared selection-state helpers for exportable selected notes and selected locked notes that still need unlocking.

@@ -2745,6 +2745,7 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
     var moveDialogOpen by remember { mutableStateOf(false) }
     var tagDialogOpen by remember { mutableStateOf(false) }
     var removeTagDialogOpen by remember { mutableStateOf(false) }
+    var exportMenuOpen by remember { mutableStateOf(false) }
     var pendingSelectedExportText by remember { mutableStateOf<String?>(null) }
     var pendingSelectedHtmlExportText by remember { mutableStateOf<String?>(null) }
     val shareableSelectedNotes = state.selectedExportableNotes
@@ -2835,35 +2836,42 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             Spacer(Modifier.width(6.dp))
             Text("Share")
         }
-        Button(
-            onClick = {
-                if (shareableSelectedNotes.isEmpty()) {
-                    viewModel.setStatus("Unlock notes before exporting")
-                } else {
-                    pendingSelectedExportText = shareableSelectedNotes.toPlainTextBundle()
-                    viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
-                    selectedExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.txt")
-                }
+        Box {
+            Button(onClick = { exportMenuOpen = true }) {
+                Icon(Icons.Default.Description, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Export")
             }
-        ) {
-            Icon(Icons.Default.Description, contentDescription = null)
-            Spacer(Modifier.width(6.dp))
-            Text("Export TXT")
-        }
-        Button(
-            onClick = {
-                if (shareableSelectedNotes.isEmpty()) {
-                    viewModel.setStatus("Unlock notes before exporting")
-                } else {
-                    pendingSelectedHtmlExportText = shareableSelectedNotes.toHtmlDocumentBundle()
-                    viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
-                    selectedHtmlExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.html")
-                }
+            DropdownMenu(expanded = exportMenuOpen, onDismissRequest = { exportMenuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("TXT") },
+                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                    onClick = {
+                        exportMenuOpen = false
+                        if (shareableSelectedNotes.isEmpty()) {
+                            viewModel.setStatus("Unlock notes before exporting")
+                        } else {
+                            pendingSelectedExportText = shareableSelectedNotes.toPlainTextBundle()
+                            viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
+                            selectedExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.txt")
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("HTML") },
+                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                    onClick = {
+                        exportMenuOpen = false
+                        if (shareableSelectedNotes.isEmpty()) {
+                            viewModel.setStatus("Unlock notes before exporting")
+                        } else {
+                            pendingSelectedHtmlExportText = shareableSelectedNotes.toHtmlDocumentBundle()
+                            viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
+                            selectedHtmlExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.html")
+                        }
+                    }
+                )
             }
-        ) {
-            Icon(Icons.Default.Description, contentDescription = null)
-            Spacer(Modifier.width(6.dp))
-            Text("Export HTML")
         }
         if (state.surface == NotesSurface.Trash) {
             Button(onClick = viewModel::batchRestoreSelected) {
