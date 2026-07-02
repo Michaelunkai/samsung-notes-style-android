@@ -3,4 +3,7 @@
     <files-path
         name="captured_images"
         path="captures/" />
+    <files-path
+        name="imported_attachments"
+        path="imports/" />
 </paths>

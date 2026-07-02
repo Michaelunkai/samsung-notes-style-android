@@ -1925,11 +1925,7 @@ fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = 
         if (request.sharedAttachments.isNotEmpty()) {
             val importedBlocks = request.sharedAttachments.map { shared ->
                 val uri = Uri.parse(shared.uri)
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                val metadata = queryAttachmentMetadata(context, uri)
-                metadata.copy(mimeHint = shared.mimeHint ?: metadata.mimeHint).toNoteBlock(shared.uri)
+                importAttachmentToLocalBlock(context, uri, shared.mimeHint)
             }
             viewModel.createSharedImportNote(request.sharedText, importedBlocks)
         } else {
@@ -4285,6 +4281,25 @@ fun AttachmentMetadata.toNoteBlock(uri: String): NoteBlock =
             sizeBytes = sizeBytes
         )
     }
+
+fun importAttachmentToLocalBlock(context: Context, uri: Uri, mimeHint: String? = null): NoteBlock {
+    val metadata = queryAttachmentMetadata(context, uri).let { queried ->
+        if (mimeHint.isNullOrBlank()) queried else queried.copy(mimeHint = mimeHint)
+    }
+    val importDir = File(context.filesDir, "imports").apply { mkdirs() }
+    val file = File(importDir, "${System.currentTimeMillis()}-${metadata.name.safeLocalFileName()}")
+    context.contentResolver.openInputStream(uri)?.use { input ->
+        file.outputStream().use { output -> input.copyTo(output) }
+    } ?: error("Unable to open imported attachment")
+    val localUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    return metadata.copy(sizeBytes = file.length()).toNoteBlock(localUri.toString())
+}
+
+fun String.safeLocalFileName(): String =
+    replace(Regex("""[\\/:*?"<>|\u0000-\u001F]+"""), "-")
+        .trim()
+        .ifBlank { "attachment" }
+        .take(96)
 
 fun createCameraCaptureTarget(context: Context): CameraCaptureTarget {
     val captureDir = File(context.filesDir, "captures").apply { mkdirs() }

@@ -1312,6 +1312,14 @@ class NoteModelTest {
     }
 
     @Test
+    fun localImportFileNamesAreSafeAndBounded() {
+        assertEquals("brief.pdf", "brief.pdf".safeLocalFileName())
+        assertEquals("Work-Plan-Q3-.pdf", "Work/Plan:Q3?.pdf".safeLocalFileName())
+        assertEquals("attachment", "   ".safeLocalFileName())
+        assertEquals(96, "a".repeat(140).safeLocalFileName().length)
+    }
+
+    @Test
     fun audioDurationFormattingUsesMinuteSecondLabels() {
         assertEquals("", formatDuration(0))
         assertEquals("0:01", formatDuration(1_500))

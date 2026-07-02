@@ -11,6 +11,7 @@
 - Added rich HTML note export alongside plain text share/export and PDF export.
 - Grouped editor share/export actions into a compact overflow menu to reduce toolbar crowding.
 - Broadened Android share/import targets to text, image, audio, video, and application document MIME types.
+- Shared attachments are copied into app-private storage so imported files survive after temporary share grants expire.
 - Added meeting-note launcher shortcuts and widget quick actions.
 - Added per-note pinned Home screen shortcut requests from note cards and the editor overflow menu.
 
