@@ -428,6 +428,8 @@ data class EmptyNotesCopy(
     val actionLabel: String? = null
 )
 
+data class LibraryInsight(val label: String, val value: String)
+
 data class DrawPoint(val x: Float, val y: Float)
 
 data class DrawStroke(
@@ -889,6 +891,34 @@ fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
         subtitle = "Create a text note, checklist, handwriting page, or imported note.",
         actionLabel = noteDefaults.newNoteKind.title
     )
+}
+
+fun NotesUiState.libraryInsights(now: Long = System.currentTimeMillis()): List<LibraryInsight> {
+    val activeNotes = notes.filter { !it.deleted && !it.archived }
+    val checklistTotal = activeNotes.sumOf { it.checklistTotalCount() }
+    val checklistDone = activeNotes.sumOf { it.checklistDoneCount() }
+    val overdueReminders = activeNotes.count { (it.reminderAt ?: Long.MAX_VALUE) < now }
+    val upcomingReminders = activeNotes.count { (it.reminderAt ?: 0L) >= now }
+    val mediaBlocks = activeNotes.sumOf { it.mediaBlockCount() }
+    return buildList {
+        add(LibraryInsight("Active", activeNotes.size.toString()))
+        if (folders.isNotEmpty()) add(LibraryInsight("Folders", folders.size.toString()))
+        if (tags.isNotEmpty()) add(LibraryInsight("Tags", tags.size.toString()))
+        if (checklistTotal > 0) add(LibraryInsight("Tasks", "$checklistDone/$checklistTotal"))
+        if (overdueReminders > 0) {
+            add(LibraryInsight("Reminders", "$overdueReminders overdue"))
+        } else if (upcomingReminders > 0) {
+            add(LibraryInsight("Reminders", "$upcomingReminders upcoming"))
+        }
+        if (mediaBlocks > 0) add(LibraryInsight("Media", mediaBlocks.toString()))
+        if (lockedCount > 0) add(LibraryInsight("Locked", lockedCount.toString()))
+        add(
+            LibraryInsight(
+                "Backup",
+                if (autoBackupSummary.hasLatest) "${autoBackupSummary.latestNoteCount} notes" else "Not yet"
+            )
+        )
+    }
 }
 
 class NotesViewModel(application: Application) : AndroidViewModel(application) {
@@ -2710,6 +2740,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
+            LibraryInsightChips(state)
+            Spacer(Modifier.height(8.dp))
             if (state.isSelectionMode) {
                 SelectionActionBar(
                     state = state,
@@ -3174,6 +3206,19 @@ fun SelectionActionBar(
         }
         OutlinedButton(onClick = viewModel::clearSelection) {
             Text("Cancel")
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+fun LibraryInsightChips(state: NotesUiState) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        state.libraryInsights().forEach { insight ->
+            AssistChip(
+                onClick = {},
+                label = { Text("${insight.label}: ${insight.value}") }
+            )
         }
     }
 }

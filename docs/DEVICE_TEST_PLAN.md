@@ -6,7 +6,7 @@ This plan is the exact checklist for the next Android-device approval gate. Do n
 
 ## Preconditions
 
-- Full local verification has passed for version `0.5.26`.
+- Full local verification has passed for version `0.5.27`.
 - Debug APK exists at `app\build\outputs\apk\debug\app-debug.apk`.
 - Package name is `com.example.snotes`.
 - If the device already has app data that should be preserved, export a backup from the installed app before uninstalling, clearing data, or replacing it.
@@ -33,6 +33,7 @@ If install fails because of a signature mismatch, stop and ask before uninstalli
 - List/grid toggle works.
 - Search, sort, Archive, Trash, locked notes, folders, and tags are reachable.
 - Empty states and contextual create actions display correctly.
+- Library insight chips update for active notes, folders, tags, tasks, reminders, media, locked notes, and backup status.
 
 ### Note Creation
 

@@ -1299,6 +1299,71 @@ class NoteModelTest {
     }
 
     @Test
+    fun libraryInsightsSummarizeVisibleLibraryState() {
+        val now = 20_000L
+        val state = NotesUiState(
+            notes = listOf(
+                SNote(
+                    title = "Launch",
+                    folder = "Work/Product",
+                    tags = listOf("release"),
+                    locked = true,
+                    reminderAt = now - 1_000,
+                    blocks = listOf(
+                        NoteBlock.Checklist(
+                            items = listOf(
+                                CheckItem(text = "Done", checked = true),
+                                CheckItem(text = "Open", checked = false)
+                            )
+                        ),
+                        NoteBlock.Attachment(uri = "content://example/deck", name = "deck.pdf")
+                    )
+                ),
+                SNote(
+                    title = "Audio",
+                    folder = "Work",
+                    tags = listOf("meeting"),
+                    reminderAt = now + 10_000,
+                    blocks = listOf(NoteBlock.Audio(path = "/audio/clip.m4a", name = "clip.m4a"))
+                ),
+                SNote(title = "Archived", archived = true),
+                SNote(title = "Deleted", deleted = true)
+            ),
+            autoBackupSummary = AutoBackupSummary(latestModifiedAt = now, latestNoteCount = 4, snapshotCount = 2)
+        )
+
+        val insights = state.libraryInsights(now).associate { it.label to it.value }
+
+        assertEquals("2", insights["Active"])
+        assertEquals("2", insights["Folders"])
+        assertEquals("2", insights["Tags"])
+        assertEquals("1/2", insights["Tasks"])
+        assertEquals("1 overdue", insights["Reminders"])
+        assertEquals("2", insights["Media"])
+        assertEquals("1", insights["Locked"])
+        assertEquals("4 notes", insights["Backup"])
+    }
+
+    @Test
+    fun libraryInsightsShowUpcomingAndMissingBackupStates() {
+        val now = 20_000L
+        val state = NotesUiState(
+            notes = listOf(
+                SNote(title = "Soon", reminderAt = now + 5_000),
+                SNote(title = "Plain")
+            )
+        )
+
+        val insights = state.libraryInsights(now).associate { it.label to it.value }
+
+        assertEquals("2", insights["Active"])
+        assertEquals("1 upcoming", insights["Reminders"])
+        assertEquals("Not yet", insights["Backup"])
+        assertFalse(insights.containsKey("Tasks"))
+        assertFalse(insights.containsKey("Media"))
+    }
+
+    @Test
     fun roomEntityRoundTripPreservesMetadataAndBlocks() {
         val note = SNote(
             title = "Lecture",

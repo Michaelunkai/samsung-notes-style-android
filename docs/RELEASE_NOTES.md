@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.27
+
+- Added home-screen library insight chips for active notes, folders, tags, task progress, reminder urgency, media count, locked notes, and automatic-backup status.
+- Kept the insight model local and privacy-aware by counting locked notes without exposing locked content.
+- Added regression coverage for overdue/upcoming reminder summaries, task/media counts, and backup-present/missing states.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.26
 
 - Added daily journal and study-note starter templates with mixed text, checklist, sticky, and page-break structure.
