@@ -1,5 +1,28 @@
 # Release Notes
 
+## 0.4.0
+
+- Added Android alarm-backed note reminder notifications with notification-channel creation.
+- Added Android 13+ `POST_NOTIFICATIONS` permission handling when users set reminders.
+- Added notification tap-through to open the reminded note.
+- Added locked-note reminder privacy so notification titles and body text do not expose locked note content.
+- Expanded the Reminders surface with reminder labels, reminder-aware sorting, card badges, quick card actions, backup persistence, widget summaries, and Room migration/schema support.
+- Added rich HTML note export alongside plain text share/export and PDF export.
+- Grouped editor share/export actions into a compact overflow menu to reduce toolbar crowding.
+- Broadened Android share/import targets to text, image, audio, video, and application document MIME types.
+- Added meeting-note launcher shortcuts and widget quick actions.
+
+Verification for this release is local build, unit-test, manifest/resource, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
+## 0.3.0
+
+- Added reminder metadata to notes, JSON backup/import, Room persistence, search, widgets, and note details.
+- Added a dedicated Reminders navigation surface and reminder-soonest sorting.
+- Added reminder presets in note metadata and quick reminder actions from note cards.
+- Trimmed bottom navigation density while keeping Trash and Tags available through the filter rail.
+
+Verification for this release is local build/test only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.2.0
 
 - Added sticky note blocks with color, collapse, search, export, details, duplication, and quick creation support.
