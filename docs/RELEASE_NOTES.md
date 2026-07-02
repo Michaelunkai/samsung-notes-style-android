@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.4
+
+- Made title sorting and folder-sort tie-breaks use the same privacy-safe display titles shown on note cards.
+- Made title search match derived display titles for untitled public notes while avoiding locked-note body-derived title leakage.
+- Added regression coverage for display-title title search and display-title-aware sorting.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.3
 
 - Made PDF export treat page-break blocks as real logical page boundaries instead of rendering them only as text markers.

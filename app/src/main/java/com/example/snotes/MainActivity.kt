@@ -765,15 +765,15 @@ enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
     ),
     TitleAscending(
         "Title A-Z",
-        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.title.lowercase() }
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.sortableDisplayTitle() }
     ),
     TitleDescending(
         "Title Z-A",
-        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenByDescending { it.title.lowercase() }
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenByDescending { it.sortableDisplayTitle() }
     ),
     FolderAscending(
         "Folder",
-        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.folder.lowercase() }.thenBy { it.title.lowercase() }
+        compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.folder.lowercase() }.thenBy { it.sortableDisplayTitle() }
     ),
     ReminderSoonest(
         "Reminder soonest",
@@ -1789,6 +1789,9 @@ fun SNote.displayTitle(includePrivateContent: Boolean = true): String {
         ?: normalizedTitleOrNull(title)
         ?: "Untitled note"
 }
+
+fun SNote.sortableDisplayTitle(): String =
+    displayTitle(includePrivateContent = false).lowercase(Locale.getDefault())
 
 fun normalizedTitleOrNull(raw: String): String? =
     raw.trim().replace(Regex("""\s+"""), " ").takeIf { it.isNotBlank() }
@@ -4900,8 +4903,9 @@ fun SNote.searchMatches(query: String, scope: SearchScope = SearchScope.All): Li
     val normalized = query.trim()
     if (normalized.isBlank()) return emptyList()
     val matches = buildList {
-        if (scope.includes(SearchScope.Title) && title.contains(normalized, ignoreCase = true)) {
-            add(SearchMatch(SearchScope.Title, "Title: $title"))
+        val searchableTitle = displayTitle(includePrivateContent = false)
+        if (scope.includes(SearchScope.Title) && searchableTitle.contains(normalized, ignoreCase = true)) {
+            add(SearchMatch(SearchScope.Title, "Title: $searchableTitle"))
         }
         if (scope.includes(SearchScope.Folders) && folder.contains(normalized, ignoreCase = true)) {
             add(SearchMatch(SearchScope.Folders, "Folder: $folder"))

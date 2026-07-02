@@ -368,6 +368,23 @@ class NoteModelTest {
     }
 
     @Test
+    fun titleSearchUsesPrivacySafeDisplayTitles() {
+        val publicUntitled = SNote(
+            title = "Untitled note",
+            blocks = listOf(NoteBlock.Text(text = "Launch plan"))
+        )
+        val lockedUntitled = SNote(
+            title = "Untitled note",
+            locked = true,
+            blocks = listOf(NoteBlock.Text(text = "Secret plan"))
+        )
+
+        assertEquals(listOf("Title: Launch plan"), publicUntitled.searchMatches("launch", SearchScope.Title).map { it.label })
+        assertTrue(lockedUntitled.searchMatches("secret", SearchScope.Title).isEmpty())
+        assertEquals(listOf("Title: Locked note"), lockedUntitled.searchMatches("locked", SearchScope.Title).map { it.label })
+    }
+
+    @Test
     fun librarySummaryShowsSearchScopeOnlyWhileSearching() {
         val idle = NotesUiState(notes = emptyList())
         val searching = idle.copy(search = "release", searchScope = SearchScope.Tags)
@@ -1337,32 +1354,39 @@ class NoteModelTest {
                     NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf"),
                     NoteBlock.Audio(path = "/audio/one.m4a", name = "one.m4a")
                 )
+            ),
+            SNote(
+                title = "Untitled note",
+                folder = "C",
+                createdAt = 6,
+                updatedAt = 6,
+                blocks = listOf(NoteBlock.Text(text = "Agenda"))
             )
         )
 
         val titleState = NotesUiState(notes = notes, sortMode = NoteSortMode.TitleAscending)
-        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta", "Media", "Tasks"), titleState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Agenda", "Alpha", "Beta", "Media", "Tasks"), titleState.visibleNotes.map { it.displayTitle() })
 
         val createdState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedNewest)
-        assertEquals(listOf("Pinned", "Favorite", "Media", "Tasks", "Alpha", "Beta"), createdState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Agenda", "Media", "Tasks", "Alpha", "Beta"), createdState.visibleNotes.map { it.displayTitle() })
 
         val modifiedOldestState = NotesUiState(notes = notes, sortMode = NoteSortMode.ModifiedOldest)
-        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha", "Tasks", "Media"), modifiedOldestState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha", "Tasks", "Media", "Agenda"), modifiedOldestState.visibleNotes.map { it.displayTitle() })
 
         val createdOldestState = NotesUiState(notes = notes, sortMode = NoteSortMode.CreatedOldest)
-        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha", "Tasks", "Media"), createdOldestState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Beta", "Alpha", "Tasks", "Media", "Agenda"), createdOldestState.visibleNotes.map { it.displayTitle() })
 
         val titleDescendingState = NotesUiState(notes = notes, sortMode = NoteSortMode.TitleDescending)
-        assertEquals(listOf("Pinned", "Favorite", "Tasks", "Media", "Beta", "Alpha"), titleDescendingState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Tasks", "Media", "Beta", "Alpha", "Agenda"), titleDescendingState.visibleNotes.map { it.displayTitle() })
 
         val folderState = NotesUiState(notes = notes, sortMode = NoteSortMode.FolderAscending)
-        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta", "Tasks", "Media"), folderState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Alpha", "Beta", "Agenda", "Tasks", "Media"), folderState.visibleNotes.map { it.displayTitle() })
 
         val checklistState = NotesUiState(notes = notes, sortMode = NoteSortMode.ChecklistProgress)
-        assertEquals(listOf("Pinned", "Favorite", "Tasks", "Media", "Alpha", "Beta"), checklistState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Tasks", "Agenda", "Media", "Alpha", "Beta"), checklistState.visibleNotes.map { it.displayTitle() })
 
         val mediaState = NotesUiState(notes = notes, sortMode = NoteSortMode.MediaHeavy)
-        assertEquals(listOf("Pinned", "Favorite", "Media", "Tasks", "Alpha", "Beta"), mediaState.visibleNotes.map { it.title })
+        assertEquals(listOf("Pinned", "Favorite", "Media", "Agenda", "Tasks", "Alpha", "Beta"), mediaState.visibleNotes.map { it.displayTitle() })
     }
 
     @Test
