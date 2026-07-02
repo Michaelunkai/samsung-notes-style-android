@@ -2,7 +2,7 @@
 
 Native Android prototype for a Samsung Notes-style note-taking app.
 
-Current local build version: `0.5.19`.
+Current local build version: `0.5.20`.
 
 ## Implemented in this workspace
 
@@ -22,7 +22,7 @@ Current local build version: `0.5.19`.
 - Local offline-first Room persistence with a first-run migration path from the legacy JSON note store and indexed note metadata for deleted, locked, reminder, and archived states.
 - Row-level Room upserts for normal note edits to avoid rewriting the whole note table during editor changes.
 - Local Notes PIN support for locked notes, with locked previews, privacy-gated batch lock removal, and derived private titles hidden from search, cards, notifications, shortcuts, and widgets.
-- JSON backup export/import with schema/app/note-count metadata, expired-Trash import pruning, source-aware import status, deterministic imported-note merging, plus per-note plain text export/share, rich HTML export, PDF export with page-style metadata and page-break pagination, and single-note Backup JSON export.
+- JSON backup export/import with schema/app/note-count metadata, expired-Trash import pruning, source-aware import status, deterministic imported-note merging, app-private rolling automatic backup snapshots, plus per-note plain text export/share, rich HTML export, PDF export with page-style metadata and page-break pagination, and single-note Backup JSON export.
 - Android share targets for incoming text, images, audio, video, and application documents, with imported audio promoted to playable audio blocks.
 - Home-screen widget provider with latest visible-note preview, locked-note privacy, Archive/Trash exclusion, library glance status for reminders/checklists/media, latest-note open target, and quick text/checklist/sticky/handwriting/meeting actions.
 - Static launcher shortcuts for quick text, checklist, sticky, handwriting, and meeting notes, plus per-note pinned Home screen shortcut requests from note actions.

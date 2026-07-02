@@ -1,5 +1,7 @@
 package com.example.snotes
 
+import java.io.File
+import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -1665,6 +1667,47 @@ class NoteModelTest {
             )
         )
         assertEquals("Imported 3 notes", backupImportStatus(importedCount = 3, metadata = null))
+    }
+
+    @Test
+    fun autoBackupSnapshotsKeepLatestAndPruneRollingHistory() {
+        val root = Files.createTempDirectory("snotes-backups").toFile()
+        try {
+            repeat(AUTO_BACKUP_MAX_SNAPSHOTS + 2) { index ->
+                writeAutoBackupSnapshot(
+                    filesDir = root,
+                    notes = listOf(SNote(id = index.toString(), title = "Snapshot $index")),
+                    now = 1_000L + index * AUTO_BACKUP_MIN_INTERVAL_MS
+                )
+            }
+
+            val backupDir = File(root, AUTO_BACKUP_DIR)
+            val latest = File(backupDir, AUTO_BACKUP_LATEST_FILE)
+            val snapshots = backupDir.autoBackupSnapshots().sortedBy { it.name }
+
+            assertEquals(listOf("6"), notesFromBackupJson(latest.readText()).map { it.id })
+            assertEquals(AUTO_BACKUP_MAX_SNAPSHOTS, snapshots.size)
+            assertEquals(listOf("2", "3", "4", "5", "6"), snapshots.map { notesFromBackupJson(it.readText()).single().id })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun autoBackupSnapshotsThrottleRollingFilesButRefreshLatest() {
+        val root = Files.createTempDirectory("snotes-backups-throttle").toFile()
+        try {
+            writeAutoBackupSnapshot(root, listOf(SNote(id = "first", title = "First")), now = 1_000L)
+            writeAutoBackupSnapshot(root, listOf(SNote(id = "second", title = "Second")), now = 1_000L + AUTO_BACKUP_MIN_INTERVAL_MS / 2)
+
+            val backupDir = File(root, AUTO_BACKUP_DIR)
+            val latest = File(backupDir, AUTO_BACKUP_LATEST_FILE)
+
+            assertEquals(1, backupDir.autoBackupSnapshots().size)
+            assertEquals(listOf("second"), notesFromBackupJson(latest.readText()).map { it.id })
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test

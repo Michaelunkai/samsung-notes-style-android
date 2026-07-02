@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.20
+
+- Added app-private automatic backup snapshots after successful Room saves and deletes.
+- Maintained a refreshed `latest.json` backup plus a throttled rolling snapshot history capped at five files.
+- Added regression coverage for latest-backup refresh, snapshot throttling, and retention pruning.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.19
 
 - Added regression coverage proving selected-note and single-note Backup JSON payloads preserve backup metadata and round-trip note content.

@@ -14,6 +14,7 @@ import androidx.room.Transaction
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.io.File
+import java.util.Locale
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -102,12 +103,17 @@ class RoomNoteRepository(context: Context) {
     suspend fun save(notes: List<SNote>) {
         mutex.withLock {
             database.noteDao().replaceAll(notes.map { it.toEntity() })
+            writeAutoBackupSnapshot(appContext.filesDir, notes)
         }
     }
 
     suspend fun saveNote(note: SNote) {
         mutex.withLock {
+            val updatedNotes = database.noteDao().loadAll()
+                .map { it.toNote() }
+                .replaceOrAdd(note)
             database.noteDao().upsert(note.toEntity())
+            writeAutoBackupSnapshot(appContext.filesDir, updatedNotes)
         }
     }
 
@@ -115,6 +121,8 @@ class RoomNoteRepository(context: Context) {
         if (ids.isEmpty()) return
         mutex.withLock {
             database.noteDao().deleteByIds(ids.toList())
+            val remainingNotes = database.noteDao().loadAll().map { it.toNote() }
+            writeAutoBackupSnapshot(appContext.filesDir, remainingNotes)
         }
     }
 
@@ -222,3 +230,49 @@ fun NoteEntity.toNote(): SNote = SNote(
 )
 
 fun SNote.toBackupJson(): JSONObject = toJson()
+
+const val AUTO_BACKUP_DIR = "auto_backups"
+const val AUTO_BACKUP_LATEST_FILE = "latest.json"
+const val AUTO_BACKUP_MAX_SNAPSHOTS = 5
+const val AUTO_BACKUP_MIN_INTERVAL_MS = 10 * 60 * 1000L
+
+fun writeAutoBackupSnapshot(filesDir: File, notes: List<SNote>, now: Long = System.currentTimeMillis()) {
+    val backupDir = File(filesDir, AUTO_BACKUP_DIR).apply { mkdirs() }
+    val payload = notesToBackupJson(notes)
+    File(backupDir, AUTO_BACKUP_LATEST_FILE).writeTextAtomically(payload).setLastModified(now)
+    val snapshots = backupDir.autoBackupSnapshots()
+    val newestSnapshot = snapshots.maxByOrNull { it.lastModified() }
+    if (newestSnapshot == null || now - newestSnapshot.lastModified() >= AUTO_BACKUP_MIN_INTERVAL_MS) {
+        File(backupDir, "snapshot-${String.format(Locale.US, "%013d", now)}.json")
+            .writeTextAtomically(payload)
+            .setLastModified(now)
+    }
+    backupDir.pruneAutoBackupSnapshots()
+}
+
+fun File.autoBackupSnapshots(): List<File> =
+    listFiles { file -> file.isFile && file.name.startsWith("snapshot-") && file.name.endsWith(".json") }
+        ?.toList()
+        .orEmpty()
+
+fun File.pruneAutoBackupSnapshots(maxSnapshots: Int = AUTO_BACKUP_MAX_SNAPSHOTS) {
+    autoBackupSnapshots()
+        .sortedByDescending { it.name }
+        .drop(maxSnapshots)
+        .forEach { it.delete() }
+}
+
+private fun File.writeTextAtomically(text: String): File {
+    val temp = File(parentFile, "$name.tmp")
+    temp.writeText(text)
+    if (exists()) delete()
+    temp.renameTo(this)
+    return this
+}
+
+private fun List<SNote>.replaceOrAdd(note: SNote): List<SNote> =
+    if (any { it.id == note.id }) {
+        map { if (it.id == note.id) note else it }
+    } else {
+        listOf(note) + this
+    }
