@@ -1,6 +1,6 @@
 # Verification
 
-This project was packaged from the Codex Android implementation workspace on 2026-07-01 and updated through version `0.5.4` on 2026-07-02.
+This project was packaged from the Codex Android implementation workspace on 2026-07-01 and updated through version `0.5.5` on 2026-07-02.
 
 ## Local verification command
 
@@ -12,7 +12,7 @@ The script uses `.tooling\jdk`, `.tooling\android-sdk`, and `.tooling\gradle` wh
 
 ## Current verified surface
 
-- Full local verification completed on 2026-07-02 for version `0.5.4`.
+- Full local verification completed on 2026-07-02 for version `0.5.5`.
 - Command shape: `:app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
 - Debug Kotlin compilation: `:app:compileDebugKotlin`
 - JVM unit tests: `:app:testDebugUnitTest`
@@ -31,4 +31,4 @@ Current Android-device testing is intentionally deferred until the explicit appr
 - Debug APK path: `app\build\outputs\apk\debug\app-debug.apk`
 - A previous build was launched on Samsung SM-S938B with Android package `com.example.snotes`.
 
-`docs\evidence\launch-screen.png` captures that earlier launched app home screen and should not be treated as current `0.5.4` device proof.
+`docs\evidence\launch-screen.png` captures that earlier launched app home screen and should not be treated as current `0.5.5` device proof.

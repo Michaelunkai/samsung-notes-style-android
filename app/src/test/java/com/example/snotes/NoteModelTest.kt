@@ -135,6 +135,7 @@ class NoteModelTest {
         assertEquals("No reminders", NotesUiState(surface = NotesSurface.Reminders).emptyNotesCopy().title)
         assertEquals("No locked notes", NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().title)
         assertEquals("Archive is empty", NotesUiState(surface = NotesSurface.Archived).emptyNotesCopy().title)
+        assertEquals("New note", NotesUiState(surface = NotesSurface.Archived).emptyNotesCopy().actionLabel)
         assertNull(NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().actionLabel)
         assertEquals(
             "New note",
@@ -293,6 +294,7 @@ class NoteModelTest {
         val reminderState = NotesUiState(surface = NotesSurface.Reminders)
         val lockedState = NotesUiState(surface = NotesSurface.Locked, notePinDigest = hashNotesPin("1234"))
         val unlockedState = NotesUiState(surface = NotesSurface.Locked)
+        val archivedState = NotesUiState(surface = NotesSurface.Archived)
 
         val folderNote = NewNoteKind.Text.createNoteForState(folderState)
         val tagNote = NewNoteKind.Checklist.createNoteForState(tagState)
@@ -300,6 +302,7 @@ class NoteModelTest {
         val meetingNote = NewNoteKind.Meeting.createNoteForState(folderState)
         val lockedNote = NewNoteKind.Sticky.createNoteForState(lockedState)
         val unlockedNote = NewNoteKind.Text.createNoteForState(unlockedState)
+        val archivedNote = NewNoteKind.Text.createNoteForState(archivedState)
 
         assertEquals("Work/Product", folderNote.folder)
         assertEquals(PageTemplate.Grid, folderNote.pageTemplate)
@@ -310,6 +313,8 @@ class NoteModelTest {
         assertTrue(meetingNote.blocks.any { it is NoteBlock.Checklist })
         assertTrue(lockedNote.locked)
         assertFalse(unlockedNote.locked)
+        assertTrue(archivedNote.archived)
+        assertFalse(archivedNote.pinned)
     }
 
     @Test

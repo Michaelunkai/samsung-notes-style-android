@@ -848,7 +848,8 @@ fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
     )
     surface == NotesSurface.Archived -> EmptyNotesCopy(
         title = "Archive is empty",
-        subtitle = "Archive notes you want to keep out of the main list without deleting them."
+        subtitle = "Archive notes you want to keep out of the main list without deleting them.",
+        actionLabel = noteDefaults.newNoteKind.title
     )
     surface == NotesSurface.Folders && folderFilter != null -> EmptyNotesCopy(
         title = "No notes in $folderFilter",
@@ -1634,6 +1635,7 @@ fun NewNoteKind.createNoteForState(state: NotesUiState): SNote {
         state.surface == NotesSurface.Tags && state.tagFilter != null -> note.copy(tags = listOf(state.tagFilter))
         state.surface == NotesSurface.Reminders -> note.copy(reminderAt = reminderPresetTimestamp(1))
         state.surface == NotesSurface.Locked && state.hasNotePin -> note.copy(locked = true)
+        state.surface == NotesSurface.Archived -> note.copy(archived = true, pinned = false)
         else -> note
     }
 }

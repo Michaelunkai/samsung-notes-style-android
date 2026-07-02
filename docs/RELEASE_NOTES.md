@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.5
+
+- Made notes created from the Archive surface start archived immediately so the global create action preserves the current library context.
+- Added a default-note empty-state action for an empty Archive view.
+- Added regression coverage for Archive contextual note creation and Archive empty-state creation affordances.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.4
 
 - Made title sorting and folder-sort tie-breaks use the same privacy-safe display titles shown on note cards.
