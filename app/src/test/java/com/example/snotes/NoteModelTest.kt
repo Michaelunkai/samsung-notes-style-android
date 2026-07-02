@@ -1277,6 +1277,26 @@ class NoteModelTest {
     }
 
     @Test
+    fun trashSurfaceCanOrderByDeletionRecencyAndReviewWindow() {
+        val notes = listOf(
+            SNote(title = "Active", updatedAt = 9),
+            SNote(title = "Old trash", deleted = true, deletedAt = 1_000, updatedAt = 2),
+            SNote(title = "Fresh trash", deleted = true, deletedAt = 3_000, updatedAt = 1),
+            SNote(title = "Middle trash", deleted = true, deletedAt = 2_000, updatedAt = 3)
+        )
+
+        val newestState = NotesUiState(
+            notes = notes,
+            surface = NotesSurface.Trash,
+            sortMode = NoteSortMode.TrashNewest
+        )
+        val reviewEndingState = newestState.copy(sortMode = NoteSortMode.TrashReviewEnding)
+
+        assertEquals(listOf("Fresh trash", "Middle trash", "Old trash"), newestState.visibleNotes.map { it.title })
+        assertEquals(listOf("Old trash", "Middle trash", "Fresh trash"), reviewEndingState.visibleNotes.map { it.title })
+    }
+
+    @Test
     fun drawingEraserRemovesOnlyNearbyStrokes() {
         val nearby = DrawStroke(
             color = 0xFF111827,

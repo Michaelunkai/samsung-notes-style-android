@@ -773,6 +773,20 @@ enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
             .thenByDescending { it.favorite }
             .thenByDescending { it.mediaBlockCount() }
             .thenByDescending { it.updatedAt }
+    ),
+    TrashNewest(
+        "Trash newest",
+        compareByDescending<SNote> { it.pinned }
+            .thenByDescending { it.favorite }
+            .thenByDescending { it.deletedAt ?: it.updatedAt }
+            .thenByDescending { it.updatedAt }
+    ),
+    TrashReviewEnding(
+        "Trash review ending",
+        compareByDescending<SNote> { it.pinned }
+            .thenByDescending { it.favorite }
+            .thenBy { it.deletedAt ?: Long.MAX_VALUE }
+            .thenByDescending { it.updatedAt }
     )
 }
 

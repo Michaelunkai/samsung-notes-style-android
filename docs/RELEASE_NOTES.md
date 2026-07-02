@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.4.4
+
+- Added Trash-oriented sort modes for newest-deleted notes and review-window-ending notes.
+- Added unit coverage for Trash sorting so recycle-bin ordering remains stable.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.3
 
 - Added Trash retention labels to deleted note cards so the recycle-bin view shows both deletion age and the remaining 30-day review window.
