@@ -14,6 +14,7 @@
 - Shared attachments are copied into app-private storage so imported files survive after temporary share grants expire.
 - Removed app-private imported/captured files after their last note reference is permanently deleted or their block is removed.
 - Added PDF-aware attachment metadata, including page counts in attachment cards, search labels, backup data, and TXT/HTML exports when Android can inspect the PDF.
+- Improved large-library persistence by deleting permanently removed notes with targeted Room row deletes instead of replacing the whole note table.
 - Added meeting-note launcher shortcuts and widget quick actions.
 - Added per-note pinned Home screen shortcut requests from note cards and the editor overflow menu.
 

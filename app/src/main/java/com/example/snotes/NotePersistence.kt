@@ -63,6 +63,9 @@ interface NoteDao {
     @Query("DELETE FROM notes")
     suspend fun deleteAll()
 
+    @Query("DELETE FROM notes WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
+
     @Transaction
     suspend fun replaceAll(notes: List<NoteEntity>) {
         deleteAll()
@@ -101,6 +104,13 @@ class RoomNoteRepository(context: Context) {
     suspend fun saveNote(note: SNote) {
         mutex.withLock {
             database.noteDao().upsert(note.toEntity())
+        }
+    }
+
+    suspend fun deleteNotes(ids: Collection<String>) {
+        if (ids.isEmpty()) return
+        mutex.withLock {
+            database.noteDao().deleteByIds(ids.toList())
         }
     }
 

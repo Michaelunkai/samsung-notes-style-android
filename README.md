@@ -30,7 +30,7 @@ Current local build version: `0.4.0`.
 ## Important implementation notes
 
 - This is a functional local prototype, not a full production Samsung Notes replacement.
-- The current persistence layer uses Room for indexed note metadata and stores mixed note blocks as JSON payloads. A production-scale version would split pages, ink strokes, attachments, and audio timeline events into their own Room tables.
+- The current persistence layer uses Room for indexed note metadata, targeted single-note upserts/deletes for common edit and trash flows, and mixed note blocks as JSON payloads. A production-scale version would split pages, ink strokes, attachments, and audio timeline events into their own Room tables.
 - Cloud sync, OCR, PDF annotation/import editing, Samsung account integration, real-time collaboration, and server-side conflict resolution remain architectural phases outside this local prototype.
 - Samsung-owned assets, names, formats, and account APIs are intentionally not used.
 

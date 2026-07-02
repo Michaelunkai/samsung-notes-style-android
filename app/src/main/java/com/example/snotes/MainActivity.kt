@@ -1180,7 +1180,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         cleanupUnreferencedLocalFiles(note.blocks)
-        persist()
+        persistDeletedNotes(listOf(note.id))
     }
 
     fun batchFavoriteSelected(favorite: Boolean) {
@@ -1311,7 +1311,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         cleanupUnreferencedLocalFiles(deletedBlocks)
-        persist()
+        persistDeletedNotes(deletedIds)
     }
 
     fun restoreAllTrash() {
@@ -1340,7 +1340,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         cleanupUnreferencedLocalFiles(deletedNotes.flatMap { it.blocks })
-        persist()
+        persistDeletedNotes(deletedIds)
     }
 
     private fun updateSelectedNotes(statusMessage: String = "Updated selected notes", transform: (SNote) -> SNote) {
@@ -1414,6 +1414,14 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.saveNote(note)
             scheduleNoteReminder(getApplication(), note)
+            refreshNotesWidgets(getApplication())
+        }
+    }
+
+    private fun persistDeletedNotes(ids: Collection<String>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteNotes(ids)
             refreshNotesWidgets(getApplication())
         }
     }
