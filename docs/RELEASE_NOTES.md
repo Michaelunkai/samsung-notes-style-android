@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.13
+
+- Added multi-select reminder actions so selected notes can be reminded tomorrow or have reminders cleared in one batch.
+- Added selection-state helpers for mixed reminder/no-reminder selections.
+- Added regression coverage for reminder action visibility state.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.12
 
 - Grouped selected-note TXT and HTML export actions under a single Export menu to reduce multi-select toolbar clutter.

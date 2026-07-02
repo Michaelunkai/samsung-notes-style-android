@@ -433,9 +433,10 @@ class NoteModelTest {
         val pinnedFavorite = SNote(id = "pinned", pinned = true, favorite = true, locked = true, archived = true)
         val lockedPrivate = SNote(id = "private", locked = true)
         val normal = SNote(id = "normal")
+        val reminded = SNote(id = "reminded", reminderAt = 2_000)
         val state = NotesUiState(
-            notes = listOf(pinnedFavorite, lockedPrivate, normal),
-            selectedNoteIds = setOf("pinned", "private", "normal"),
+            notes = listOf(pinnedFavorite, lockedPrivate, normal, reminded),
+            selectedNoteIds = setOf("pinned", "private", "normal", "reminded"),
             unlockedNoteIds = setOf("private")
         )
 
@@ -447,8 +448,10 @@ class NoteModelTest {
         assertTrue(state.selectedNotesIncludeUnlocked)
         assertTrue(state.selectedNotesIncludeArchived)
         assertTrue(state.selectedNotesIncludeUnarchived)
+        assertTrue(state.selectedNotesIncludeReminder)
+        assertTrue(state.selectedNotesIncludeNoReminder)
         assertEquals(setOf("private"), state.selectedUnlockedLockedNoteIds)
-        assertEquals(listOf("private", "normal"), state.selectedExportableNotes.map { it.id })
+        assertEquals(listOf("private", "normal", "reminded"), state.selectedExportableNotes.map { it.id })
         assertEquals(1, state.selectedLockedNotesNeedingUnlockCount)
 
         val pinnedOnly = state.copy(selectedNoteIds = setOf("pinned"))
@@ -456,9 +459,15 @@ class NoteModelTest {
         assertFalse(pinnedOnly.selectedNotesIncludeNonFavorite)
         assertFalse(pinnedOnly.selectedNotesIncludeUnlocked)
         assertFalse(pinnedOnly.selectedNotesIncludeUnarchived)
+        assertFalse(pinnedOnly.selectedNotesIncludeReminder)
+        assertTrue(pinnedOnly.selectedNotesIncludeNoReminder)
         assertTrue(pinnedOnly.selectedUnlockedLockedNoteIds.isEmpty())
         assertTrue(pinnedOnly.selectedExportableNotes.isEmpty())
         assertEquals(1, pinnedOnly.selectedLockedNotesNeedingUnlockCount)
+
+        val remindedOnly = state.copy(selectedNoteIds = setOf("reminded"))
+        assertTrue(remindedOnly.selectedNotesIncludeReminder)
+        assertFalse(remindedOnly.selectedNotesIncludeNoReminder)
     }
 
     @Test

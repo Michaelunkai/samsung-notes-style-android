@@ -676,6 +676,12 @@ data class NotesUiState(
     val selectedNotesIncludeUnarchived: Boolean
         get() = selectedNotes.any { !it.archived }
 
+    val selectedNotesIncludeReminder: Boolean
+        get() = selectedNotes.any { it.reminderAt != null }
+
+    val selectedNotesIncludeNoReminder: Boolean
+        get() = selectedNotes.any { it.reminderAt == null }
+
     val selectedUnlockedLockedNoteIds: Set<String>
         get() = selectedNotes
             .filter { note -> note.locked && note.id in unlockedNoteIds }
@@ -1272,6 +1278,12 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun batchUnarchiveSelected() {
         updateSelectedNotes("Restored selected notes from Archive") { it.copy(archived = false) }
+    }
+
+    fun batchUpdateReminderSelected(reminderAt: Long?) {
+        updateSelectedNotes(
+            if (reminderAt == null) "Cleared selected reminders" else "Reminded selected notes"
+        ) { it.copy(reminderAt = reminderAt) }
     }
 
     fun batchLockSelected(locked: Boolean) {
@@ -2920,6 +2932,18 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             if (state.selectedNotesIncludeUnarchived) {
                 Button(onClick = viewModel::batchArchiveSelected) {
                     Text("Archive")
+                }
+            }
+            if (state.selectedNotesIncludeNoReminder) {
+                Button(onClick = { viewModel.batchUpdateReminderSelected(reminderPresetTimestamp(1)) }) {
+                    Icon(Icons.Default.Notifications, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Remind")
+                }
+            }
+            if (state.selectedNotesIncludeReminder) {
+                Button(onClick = { viewModel.batchUpdateReminderSelected(null) }) {
+                    Text("Clear reminders")
                 }
             }
             Button(onClick = viewModel::batchDuplicateSelected) {
