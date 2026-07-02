@@ -42,7 +42,7 @@ fun cancelNoteReminder(context: Context, noteId: String) {
 }
 
 fun SNote.reminderNotificationTitle(): String =
-    if (locked) "Locked note reminder" else title
+    if (locked) "Locked note reminder" else displayTitle()
 
 fun SNote.reminderNotificationText(): String =
     if (locked) "Unlock the note to view its contents" else "Tap to open this note"

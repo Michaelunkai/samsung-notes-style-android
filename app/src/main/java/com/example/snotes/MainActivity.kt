@@ -1700,7 +1700,7 @@ fun SNote.moveBlock(blockId: String, direction: Int): SNote {
 }
 
 fun SNote.toPlainText(): String = buildString {
-    appendLine(title)
+    appendLine(displayTitle())
     appendLine("Folder: $folder")
     appendLine(pageStyleLabel())
     if (tags.isNotEmpty()) appendLine("Tags: ${tags.joinToString(", ") { "#$it" }}")
@@ -1724,7 +1724,7 @@ fun SNote.toHtmlDocument(): String {
         <html>
         <head>
           <meta charset="utf-8">
-          <title>${title.escapeHtml()}</title>
+          <title>${displayTitle().escapeHtml()}</title>
           <style>
             body { margin: 0; background: #f6f2e9; color: $bodyColor; font-family: Arial, sans-serif; }
             main { max-width: 820px; margin: 0 auto; min-height: 100vh; padding: 40px; background: $pageColor; box-sizing: border-box; }
@@ -1743,7 +1743,7 @@ fun SNote.toHtmlDocument(): String {
         </head>
         <body>
           <main>
-            <h1>${title.escapeHtml()}</h1>
+            <h1>${displayTitle().escapeHtml()}</h1>
             <p class="meta">Folder: ${folder.escapeHtml()}</p>
             <p class="meta">$pageStyleHtml</p>
             ${if (tagHtml.isNotBlank()) """<p class="meta">$tagHtml</p>""" else ""}
@@ -1776,6 +1776,32 @@ fun SNote.details(): NoteDetails = NoteDetails(
 
 fun SNote.pageStyleLabel(): String =
     "Page style: ${pageTemplate.label}, paper ${cssColor(paperColor)}"
+
+fun SNote.displayTitle(includePrivateContent: Boolean = true): String {
+    normalizedTitleOrNull(title)
+        ?.takeUnless { it.equals("Untitled note", ignoreCase = true) }
+        ?.let { return it }
+    if (locked && !includePrivateContent) return "Locked note"
+    return blocks.asSequence()
+        .mapNotNull { it.suggestedTitleText() }
+        .firstOrNull()
+        ?.shortcutLabel(80)
+        ?: normalizedTitleOrNull(title)
+        ?: "Untitled note"
+}
+
+fun normalizedTitleOrNull(raw: String): String? =
+    raw.trim().replace(Regex("""\s+"""), " ").takeIf { it.isNotBlank() }
+
+fun NoteBlock.suggestedTitleText(): String? = when (this) {
+    is NoteBlock.Text -> text.lineSequence().map { it.trim() }.firstOrNull { it.isNotBlank() }
+    is NoteBlock.Sticky -> text.lineSequence().map { it.trim() }.firstOrNull { it.isNotBlank() }
+    is NoteBlock.Checklist -> items.firstOrNull { it.text.isNotBlank() }?.text?.trim()
+    is NoteBlock.Attachment -> name.trim().takeIf { it.isNotBlank() }
+    is NoteBlock.Audio -> name.trim().takeIf { it.isNotBlank() }
+    is NoteBlock.Drawing -> "Handwritten note".takeIf { strokes.isNotEmpty() }
+    is NoteBlock.PageBreak -> null
+}
 
 fun SNote.cardMetaLabel(): String =
     "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • ${pageCountLabel()} • $folder"
@@ -1999,7 +2025,7 @@ fun String.sanitizeFileName(): String =
 fun shareNoteText(context: Context, note: SNote) {
     val intent = Intent(Intent.ACTION_SEND)
         .setType("text/plain")
-        .putExtra(Intent.EXTRA_SUBJECT, note.title)
+        .putExtra(Intent.EXTRA_SUBJECT, note.displayTitle(includePrivateContent = false))
         .putExtra(Intent.EXTRA_TEXT, note.toPlainText())
     context.startActivity(Intent.createChooser(intent, "Share note"))
 }
@@ -2028,7 +2054,7 @@ fun writeNotePdf(context: Context, uri: Uri, note: SNote) {
             val canvas = page.canvas
             var y = margin
             if (pageNumber == 1) {
-                canvas.drawText(note.title, margin, y, titlePaint)
+                canvas.drawText(note.displayTitle(), margin, y, titlePaint)
                 y += lineHeight * 1.5f
             }
             chunk.forEach { line ->
@@ -2114,8 +2140,8 @@ fun requestPinnedNoteShortcut(context: Context, note: SNote): Boolean {
         .setAction(Intent.ACTION_VIEW)
         .putExtra(EXTRA_OPEN_NOTE_ID, note.id)
     val shortcut = ShortcutInfo.Builder(context, pinnedNoteShortcutId(note.id))
-        .setShortLabel(note.title.shortcutLabel(18))
-        .setLongLabel(note.title.shortcutLabel(48))
+        .setShortLabel(note.displayTitle(includePrivateContent = false).shortcutLabel(18))
+        .setLongLabel(note.displayTitle(includePrivateContent = false).shortcutLabel(48))
         .setIcon(AndroidIcon.createWithResource(context, R.mipmap.ic_launcher))
         .setIntent(openIntent)
         .build()
@@ -2912,7 +2938,7 @@ fun NoteCard(
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(
-                    text = note.title,
+                    text = note.displayTitle(includePrivateContent = false),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -3262,7 +3288,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(note.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(note.displayTitle(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.selectNote(null) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -3324,7 +3350,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                                 onClick = {
                                     shareExportMenuOpen = false
                                     pendingNoteExportText = note.toPlainText()
-                                    noteExportLauncher.launch("${note.title.sanitizeFileName()}.txt")
+                                    noteExportLauncher.launch("${note.displayTitle().sanitizeFileName()}.txt")
                                 }
                             )
                             DropdownMenuItem(
@@ -3333,7 +3359,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                                 onClick = {
                                     shareExportMenuOpen = false
                                     pendingNoteExportText = note.toHtmlDocument()
-                                    noteHtmlExportLauncher.launch("${note.title.sanitizeFileName()}.html")
+                                    noteHtmlExportLauncher.launch("${note.displayTitle().sanitizeFileName()}.html")
                                 }
                             )
                             DropdownMenuItem(
@@ -3342,7 +3368,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                                 onClick = {
                                     shareExportMenuOpen = false
                                     pendingPdfExportNote = note
-                                    notePdfExportLauncher.launch("${note.title.sanitizeFileName()}.pdf")
+                                    notePdfExportLauncher.launch("${note.displayTitle().sanitizeFileName()}.pdf")
                                 }
                             )
                         }
@@ -3638,7 +3664,7 @@ fun UnlockNoteDialog(note: SNote, onUnlock: (String) -> Unit, onDismiss: () -> U
         title = { Text("Unlock note") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(note.title, style = MaterialTheme.typography.labelLarge)
+                Text(note.displayTitle(includePrivateContent = false), style = MaterialTheme.typography.labelLarge)
                 OutlinedTextField(
                     modifier = Modifier.fillMaxWidth(),
                     value = notesPin,

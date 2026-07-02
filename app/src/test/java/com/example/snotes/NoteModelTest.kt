@@ -340,6 +340,34 @@ class NoteModelTest {
     }
 
     @Test
+    fun displayTitleFallsBackToFirstMeaningfulContentWithoutLeakingLockedNotes() {
+        val textTitle = SNote(
+            title = "Untitled note",
+            blocks = listOf(NoteBlock.Text(text = "\n Launch plan \nBody"))
+        )
+        val checklistTitle = SNote(
+            title = " ",
+            blocks = listOf(NoteBlock.Checklist(items = listOf(CheckItem(text = "Buy milk"))))
+        )
+        val explicitLocked = SNote(
+            title = "Private title",
+            locked = true,
+            blocks = listOf(NoteBlock.Text(text = "Secret body"))
+        )
+        val derivedLocked = SNote(
+            title = "Untitled note",
+            locked = true,
+            blocks = listOf(NoteBlock.Text(text = "Secret body"))
+        )
+
+        assertEquals("Launch plan", textTitle.displayTitle())
+        assertEquals("Buy milk", checklistTitle.displayTitle())
+        assertEquals("Private title", explicitLocked.displayTitle(includePrivateContent = false))
+        assertEquals("Locked note", derivedLocked.displayTitle(includePrivateContent = false))
+        assertEquals("Secret body", derivedLocked.displayTitle())
+    }
+
+    @Test
     fun librarySummaryShowsSearchScopeOnlyWhileSearching() {
         val idle = NotesUiState(notes = emptyList())
         val searching = idle.copy(search = "release", searchScope = SearchScope.Tags)
@@ -666,7 +694,7 @@ class NoteModelTest {
     @Test
     fun notePlainTextExportIncludesMixedContent() {
         val note = SNote(
-            title = "Sprint review",
+            title = "Untitled note",
             folder = "Work",
             tags = listOf("team", "export"),
             pageTemplate = PageTemplate.Planner,
@@ -701,7 +729,7 @@ class NoteModelTest {
 
         val text = note.toPlainText()
 
-        assertTrue(text.contains("Sprint review"))
+        assertTrue(text.startsWith("Release summary"))
         assertTrue(text.contains("Folder: Work"))
         assertTrue(text.contains("Page style: Planner, paper #FFF8D6"))
         assertTrue(text.contains("Tags: #team, #export"))
@@ -791,7 +819,7 @@ class NoteModelTest {
 
     @Test
     fun reminderNotificationCopyHidesLockedNoteContent() {
-        val unlocked = SNote(title = "Dentist appointment")
+        val unlocked = SNote(title = "Untitled note", blocks = listOf(NoteBlock.Text(text = "Dentist appointment")))
         val locked = SNote(title = "Private plan", locked = true)
 
         assertEquals("Dentist appointment", unlocked.reminderNotificationTitle())
@@ -1021,7 +1049,7 @@ class NoteModelTest {
         val normal = notesWidgetSummary(
             listOf(
                 SNote(id = "old", title = "Old", updatedAt = 1, blocks = listOf(NoteBlock.Text(text = "Old body"))),
-                SNote(id = "latest", title = "Latest", updatedAt = 3, blocks = listOf(NoteBlock.Text(text = "Latest body"))),
+                SNote(id = "latest", title = "Untitled note", updatedAt = 3, blocks = listOf(NoteBlock.Text(text = "Latest body"))),
                 SNote(title = "Archived", archived = true, updatedAt = 6),
                 SNote(title = "Deleted", deleted = true, updatedAt = 5)
             )
@@ -1035,7 +1063,7 @@ class NoteModelTest {
         val locked = notesWidgetSummary(listOf(SNote(title = "Private", locked = true, blocks = listOf(NoteBlock.Text(text = "Secret")))))
 
         assertEquals(NotesWidgetSummary("S Notes Style", "No notes yet"), empty)
-        assertEquals("Latest", normal.title)
+        assertEquals("Latest body", normal.title)
         assertEquals("latest", normal.noteId)
         assertTrue(normal.subtitle.contains("Latest body"))
         assertTrue(normal.subtitle.contains("2 notes"))

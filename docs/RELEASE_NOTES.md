@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.5.1
+
+- Added smart display titles that fall back to the first meaningful text, checklist, sticky, attachment, audio, or handwriting content when a note is still untitled.
+- Applied display titles to note cards, editor chrome, widgets, reminder notifications, pinned shortcuts, share/export subjects, export filenames, TXT/HTML/PDF exports, and PDF rendering.
+- Preserved locked-note privacy by avoiding body-derived display titles on locked cards, widgets, shortcuts, and unlock prompts unless the note is already open.
+- Added regression coverage for title derivation, locked-note privacy, widget display titles, reminder titles, and text export fallback titles.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.0
 
 - Added page-break blocks to the note editor so notes can be structured into lightweight pages while keeping existing text, checklist, sticky, handwriting, attachment, and audio blocks intact.

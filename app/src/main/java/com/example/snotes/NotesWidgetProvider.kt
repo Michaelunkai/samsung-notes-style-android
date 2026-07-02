@@ -25,7 +25,7 @@ fun notesWidgetSummary(notes: List<SNote>, now: Long = System.currentTimeMillis(
     val latest = visible.firstOrNull()
     val status = notesWidgetStatus(visible, now)
     return NotesWidgetSummary(
-        title = latest?.title ?: "S Notes Style",
+        title = latest?.displayTitle(includePrivateContent = false) ?: "S Notes Style",
         subtitle = when {
             latest == null -> "No notes yet"
             latest.locked -> "Locked note • $status"

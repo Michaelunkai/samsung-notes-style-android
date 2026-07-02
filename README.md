@@ -2,12 +2,12 @@
 
 Native Android prototype for a Samsung Notes-style note-taking app.
 
-Current local build version: `0.5.0`.
+Current local build version: `0.5.1`.
 
 ## Implemented in this workspace
 
 - Kotlin Android project scaffold using Gradle Kotlin DSL and Jetpack Compose.
-- Notes home screen with persisted list/grid, sort, search-scope, and default note-type preferences, rich note-card metadata including checklist progress, reminder labels, Trash-age/retention labels with local expired-Trash pruning, and media summaries, expanded sorting including checklist-progress, reminder-soonest, media-first, trash-newest, and trash-review-ending modes, scoped search with clear action and active-scope summaries, contextual empty states, folders, tags, favorites, pinned notes, reminders, dedicated locked-notes and Archive views, trash with restore-all/empty-trash actions, light/dark mode, and multi-select actions including select-all-visible, batch duplicate, pin/unpin, favorite/unfavorite, archive/unarchive, and lock/unlock.
+- Notes home screen with persisted list/grid, smart content-derived display titles, sort, search-scope, and default note-type preferences, rich note-card metadata including checklist progress, reminder labels, Trash-age/retention labels with local expired-Trash pruning, and media summaries, expanded sorting including checklist-progress, reminder-soonest, media-first, trash-newest, and trash-review-ending modes, scoped search with clear action and active-scope summaries, contextual empty states, folders, tags, favorites, pinned notes, reminders, dedicated locked-notes and Archive views, trash with restore-all/empty-trash actions, light/dark mode, and multi-select actions including select-all-visible, batch duplicate, pin/unpin, favorite/unfavorite, archive/unarchive, and lock/unlock.
 - Folder and tag organization with note-count chips, nested folder rollups, filters, contextual note creation, bulk move/tag/untag actions, rename actions, folder deletion that moves notes back to All notes, and tag deletion that removes a tag from notes without deleting notes.
 - Editor screen with auto-persisted title, folder, tag, reminder, plain/ruled/grid/dotted/Cornell/planner templates, paper color, page breaks/page counts, meeting-note starter template, polished note details, mixed block changes, and capped note-level undo/redo.
 - Reminder scheduling with Android alarm-backed notifications, reboot rescheduling, Android 13+ notification permission handling, notification tap-through to the note, and locked-note notification privacy.
@@ -21,7 +21,7 @@ Current local build version: `0.5.0`.
 - Audio recording blocks using `MediaRecorder`, runtime microphone permission, playback, searchable timestamp markers, and shared audio import as playable audio blocks.
 - Local offline-first Room persistence with a first-run migration path from the legacy JSON note store and indexed note metadata for deleted, locked, reminder, and archived states.
 - Row-level Room upserts for normal note edits to avoid rewriting the whole note table during editor changes.
-- Local Notes PIN support for locked notes, with locked previews hidden from search and widgets.
+- Local Notes PIN support for locked notes, with locked previews and derived private titles hidden from search, cards, notifications, shortcuts, and widgets.
 - JSON backup export/import with schema/app/note-count metadata, expired-Trash import pruning, source-aware import status, deterministic imported-note merging, plus per-note plain text export/share, rich HTML export, and PDF export with page-style metadata.
 - Android share targets for incoming text, images, audio, video, and application documents, with imported audio promoted to playable audio blocks.
 - Home-screen widget provider with latest visible-note preview, locked-note privacy, Archive/Trash exclusion, library glance status for reminders/checklists/media, latest-note open target, and quick text/checklist/sticky/handwriting/meeting actions.
