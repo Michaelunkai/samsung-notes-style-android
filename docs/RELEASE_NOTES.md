@@ -3,6 +3,7 @@
 ## 0.4.0
 
 - Added Android alarm-backed note reminder notifications with notification-channel creation.
+- Added reboot handling to reschedule saved future reminders after device restart.
 - Added Android 13+ `POST_NOTIFICATIONS` permission handling when users set reminders.
 - Added notification tap-through to open the reminded note.
 - Added locked-note reminder privacy so notification titles and body text do not expose locked note content.

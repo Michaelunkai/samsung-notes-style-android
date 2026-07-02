@@ -11,6 +11,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 const val NOTE_REMINDER_ACTION = "com.example.snotes.action.NOTE_REMINDER"
 const val EXTRA_REMINDER_NOTE_ID = "com.example.snotes.extra.REMINDER_NOTE_ID"
@@ -109,5 +112,17 @@ class NoteReminderReceiver : BroadcastReceiver() {
             .setShowWhen(true)
             .build()
         manager.notify(noteId.hashCode(), notification)
+    }
+}
+
+class ReminderBootReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_LOCKED_BOOT_COMPLETED) return
+        runBlocking {
+            val notes = withContext(Dispatchers.IO) {
+                RoomNoteRepository(context.applicationContext).load()
+            }
+            scheduleAllNoteReminders(context.applicationContext, notes)
+        }
     }
 }
