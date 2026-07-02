@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.5.16
+
+- Expanded note-card reminder actions to support Tomorrow, Next week, and Next month directly from the list/grid overflow menu.
+- Added a dedicated Clear reminder action for notes that already have reminders, so rescheduling and clearing are separate, predictable commands.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.15
 
 - Expanded the multi-select Remind action into a preset menu for Tomorrow, Next week, and Next month.

@@ -2655,7 +2655,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onArchive = { viewModel.archiveNote(note) },
                             onUnarchive = { viewModel.unarchiveNote(note) },
-                            onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
+                            onSetReminder = { daysFromNow -> updateReminderWithPermission(note, reminderPresetTimestamp(daysFromNow)) },
                             onClearReminder = { updateReminderWithPermission(note, null) },
                             onToggleLock = {
                                 if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
@@ -2700,7 +2700,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onArchive = { viewModel.archiveNote(note) },
                             onUnarchive = { viewModel.unarchiveNote(note) },
-                            onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
+                            onSetReminder = { daysFromNow -> updateReminderWithPermission(note, reminderPresetTimestamp(daysFromNow)) },
                             onClearReminder = { updateReminderWithPermission(note, null) },
                             onToggleLock = {
                                 if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
@@ -3194,7 +3194,7 @@ fun NoteCard(
     onToggleFavorite: () -> Unit,
     onArchive: () -> Unit,
     onUnarchive: () -> Unit,
-    onSetReminderTomorrow: () -> Unit,
+    onSetReminder: (Int) -> Unit,
     onClearReminder: () -> Unit,
     onToggleLock: () -> Unit,
     onMoveToTrash: () -> Unit,
@@ -3310,13 +3310,39 @@ fun NoteCard(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text(if (note.reminderAt == null) "Remind tomorrow" else "Clear reminder") },
+                                text = { Text("Remind tomorrow") },
                                 leadingIcon = { Icon(Icons.Default.Notifications, null) },
                                 onClick = {
                                     menuOpen = false
-                                    if (note.reminderAt == null) onSetReminderTomorrow() else onClearReminder()
+                                    onSetReminder(1)
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text("Remind next week") },
+                                leadingIcon = { Icon(Icons.Default.Notifications, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onSetReminder(7)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Remind next month") },
+                                leadingIcon = { Icon(Icons.Default.Notifications, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onSetReminder(30)
+                                }
+                            )
+                            if (note.reminderAt != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Clear reminder") },
+                                    leadingIcon = { Icon(Icons.Default.NotificationsActive, null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        onClearReminder()
+                                    }
+                                )
+                            }
                             if (note.locked) {
                                 DropdownMenuItem(
                                     text = { Text("Unlock and edit") },
