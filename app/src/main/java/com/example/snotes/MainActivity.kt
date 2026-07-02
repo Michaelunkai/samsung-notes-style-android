@@ -2043,6 +2043,12 @@ fun List<String>.splitPdfLinesOnPageBreak(marker: String = "[Page break]"): List
     return pages.map { it.toList() }.ifEmpty { listOf(emptyList()) }
 }
 
+fun SNote.pdfPageLineChunks(maxLinesPerPage: Int): List<List<String>> =
+    toPdfLines()
+        .drop(1)
+        .splitPdfLinesOnPageBreak()
+        .flatMap { logicalPageLines -> logicalPageLines.ifEmpty { listOf(" ") }.chunked(maxLinesPerPage) }
+
 fun String.wrapLine(maxLineLength: Int): List<String> {
     if (length <= maxLineLength || maxLineLength <= 8) return listOf(this)
     val words = split(Regex("""\s+"""))
@@ -2194,45 +2200,65 @@ fun selectedExportStatus(action: String, exportedCount: Int, lockedSkippedCount:
 fun writeNotePdf(context: Context, uri: Uri, note: SNote) {
     val document = PdfDocument()
     try {
-        val titlePaint = Paint().apply {
-            color = AndroidColor.rgb(43, 42, 39)
-            textSize = 20f
-            isFakeBoldText = true
-        }
-        val bodyPaint = Paint().apply {
-            color = AndroidColor.rgb(43, 42, 39)
-            textSize = 12f
-        }
-        val pageWidth = 595
-        val pageHeight = 842
-        val margin = 48f
-        val lineHeight = 18f
-        val maxLinesPerPage = ((pageHeight - margin * 2) / lineHeight).toInt()
-        val logicalPages = note.toPdfLines().drop(1).splitPdfLinesOnPageBreak()
-        var pageNumber = 1
-        logicalPages.forEach { logicalPageLines ->
-            logicalPageLines.ifEmpty { listOf(" ") }.chunked(maxLinesPerPage).forEach { chunk ->
-                val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
-                val canvas = page.canvas
-                var y = margin
-                if (pageNumber == 1) {
-                    canvas.drawText(note.displayTitle(), margin, y, titlePaint)
-                    y += lineHeight * 1.5f
-                }
-                chunk.forEach { line ->
-                    canvas.drawText(line, margin, y, bodyPaint)
-                    y += lineHeight
-                }
-                document.finishPage(page)
-                pageNumber += 1
-            }
-        }
+        document.addNotePdfPages(note, startingPageNumber = 1)
         context.contentResolver.openOutputStream(uri)?.use { output ->
             document.writeTo(output)
         } ?: error("Unable to open PDF destination")
     } finally {
         document.close()
     }
+}
+
+fun writeNotesPdfBundle(context: Context, uri: Uri, notes: List<SNote>) {
+    require(notes.isNotEmpty()) { "At least one note is required for PDF export" }
+    val document = PdfDocument()
+    try {
+        var pageNumber = 1
+        notes.forEach { note ->
+            pageNumber = document.addNotePdfPages(note, pageNumber)
+        }
+        context.contentResolver.openOutputStream(uri)?.use { output ->
+            document.writeTo(output)
+        } ?: error("Unable to open selected-note PDF destination")
+    } finally {
+        document.close()
+    }
+}
+
+fun PdfDocument.addNotePdfPages(note: SNote, startingPageNumber: Int): Int {
+    val titlePaint = Paint().apply {
+        color = AndroidColor.rgb(43, 42, 39)
+        textSize = 20f
+        isFakeBoldText = true
+    }
+    val bodyPaint = Paint().apply {
+        color = AndroidColor.rgb(43, 42, 39)
+        textSize = 12f
+    }
+    val pageWidth = 595
+    val pageHeight = 842
+    val margin = 48f
+    val lineHeight = 18f
+    val maxLinesPerPage = ((pageHeight - margin * 2) / lineHeight).toInt()
+    var pageNumber = startingPageNumber
+    var notePageIndex = 0
+    note.pdfPageLineChunks(maxLinesPerPage).forEach { chunk ->
+        val page = startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+        val canvas = page.canvas
+        var y = margin
+        if (notePageIndex == 0) {
+            canvas.drawText(note.displayTitle(), margin, y, titlePaint)
+            y += lineHeight * 1.5f
+        }
+        chunk.forEach { line ->
+            canvas.drawText(line, margin, y, bodyPaint)
+            y += lineHeight
+        }
+        finishPage(page)
+        pageNumber += 1
+        notePageIndex += 1
+    }
+    return pageNumber
 }
 
 fun Intent.toNoteLaunchRequest(): NoteLaunchRequest =
@@ -2814,6 +2840,7 @@ fun SelectionActionBar(
     var pendingSelectedExportText by remember { mutableStateOf<String?>(null) }
     var pendingSelectedHtmlExportText by remember { mutableStateOf<String?>(null) }
     var pendingSelectedBackupExportText by remember { mutableStateOf<String?>(null) }
+    var pendingSelectedPdfExportNotes by remember { mutableStateOf<List<SNote>>(emptyList()) }
     val shareableSelectedNotes = state.selectedExportableNotes
     val lockedSkippedCount = state.selectedLockedNotesNeedingUnlockCount
     val selectedExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
@@ -2860,6 +2887,19 @@ fun SelectionActionBar(
             viewModel.setStatus("Selected note backup export failed")
         }
         pendingSelectedBackupExportText = null
+    }
+    val selectedPdfExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri: Uri? ->
+        if (uri == null) {
+            pendingSelectedPdfExportNotes = emptyList()
+            return@rememberLauncherForActivityResult
+        }
+        runCatching {
+            writeNotesPdfBundle(context, uri, pendingSelectedPdfExportNotes)
+            viewModel.setStatus("Selected notes exported as PDF")
+        }.onFailure {
+            viewModel.setStatus("Selected note PDF export failed")
+        }
+        pendingSelectedPdfExportNotes = emptyList()
     }
     if (moveDialogOpen) {
         BatchTextActionDialog(
@@ -2949,6 +2989,20 @@ fun SelectionActionBar(
                             pendingSelectedHtmlExportText = shareableSelectedNotes.toHtmlDocumentBundle()
                             viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
                             selectedHtmlExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.html")
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("PDF") },
+                    leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
+                    onClick = {
+                        exportMenuOpen = false
+                        if (shareableSelectedNotes.isEmpty()) {
+                            viewModel.setStatus("Unlock notes before exporting")
+                        } else {
+                            pendingSelectedPdfExportNotes = shareableSelectedNotes
+                            viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
+                            selectedPdfExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.pdf")
                         }
                     }
                 )

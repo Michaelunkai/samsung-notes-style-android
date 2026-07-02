@@ -1114,6 +1114,25 @@ class NoteModelTest {
     }
 
     @Test
+    fun pdfLineChunksPreserveLogicalPageAndChunkBoundaries() {
+        val note = SNote(
+            id = "chunked",
+            title = "Chunked",
+            blocks = listOf(
+                NoteBlock.Text(text = "one two three four"),
+                NoteBlock.PageBreak(),
+                NoteBlock.Text(text = "five six")
+            )
+        )
+
+        val chunks = note.pdfPageLineChunks(maxLinesPerPage = 2)
+
+        assertTrue(chunks.size >= 2)
+        assertTrue(chunks.first().isNotEmpty())
+        assertTrue(chunks.last().any { it.contains("five") || it.contains("six") })
+    }
+
+    @Test
     fun folderAndTagHelpersNormalizeOrganizationInput() {
         assertEquals("All notes", normalizeFolder("   "))
         assertEquals("Work/Product", normalizeFolder(" /Work//Product/ "))

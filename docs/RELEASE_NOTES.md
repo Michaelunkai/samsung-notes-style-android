@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.5.24
+
+- Added selected-note PDF bundle export to the multi-select Export menu.
+- Reused the locked-note privacy filter used by selected TXT, HTML, and Backup JSON exports.
+- Refactored PDF page rendering so single-note and multi-note exports share the same pagination logic.
+- Added regression coverage for multi-note PDF page-number advancement.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.23
 
 - Added Export latest auto backup to the Settings backup section.
