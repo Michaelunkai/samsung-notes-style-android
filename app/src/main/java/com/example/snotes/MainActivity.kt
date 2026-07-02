@@ -2014,18 +2014,6 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                     icon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     label = { Text("Locked") }
                 )
-                NavigationBarItem(
-                    selected = state.surface == NotesSurface.Trash,
-                    onClick = { viewModel.setSurface(NotesSurface.Trash) },
-                    icon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                    label = { Text("Trash") }
-                )
-                NavigationBarItem(
-                    selected = state.surface == NotesSurface.Tags,
-                    onClick = { viewModel.setSurface(NotesSurface.Tags) },
-                    icon = { Icon(Icons.Default.Tag, contentDescription = null) },
-                    label = { Text("Tags") }
-                )
             }
         }
     ) { padding ->
