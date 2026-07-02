@@ -483,6 +483,8 @@ val STICKY_NOTE_COLORS = listOf(
     0xFFE9D5FFL
 )
 
+const val TRASH_RETENTION_DAYS = 30
+
 data class NoteDefaults(
     val newNoteKind: NewNoteKind = NewNoteKind.Text,
     val pageTemplate: PageTemplate = PageTemplate.Plain,
@@ -1733,8 +1735,18 @@ fun SNote.trashLabel(now: Long = System.currentTimeMillis()): String? =
     if (!deleted) {
         null
     } else {
-        deletedAt?.let { "Moved to Trash ${relativeAgeLabel(it, now)}" } ?: "In Trash"
+        deletedAt?.let { "Moved to Trash ${relativeAgeLabel(it, now)} • ${trashRetentionLabel(it, now)}" } ?: "In Trash"
     }
+
+fun trashRetentionLabel(deletedAt: Long, now: Long = System.currentTimeMillis()): String {
+    val dayMs = 24L * 60L * 60L * 1_000L
+    val retentionMs = TRASH_RETENTION_DAYS * dayMs
+    val elapsedMs = (now - deletedAt).coerceAtLeast(0L)
+    val remainingMs = (retentionMs - elapsedMs).coerceAtLeast(0L)
+    if (remainingMs == 0L) return "review window ended"
+    val remainingDays = ((remainingMs + dayMs - 1L) / dayMs).coerceAtLeast(1L)
+    return "$remainingDays day${if (remainingDays == 1L) "" else "s"} left"
+}
 
 fun reminderTimestampLabel(timestamp: Long, now: Long = System.currentTimeMillis()): String {
     val prefix = if (timestamp < now) "Overdue" else "Reminder"

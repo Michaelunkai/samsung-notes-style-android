@@ -1181,11 +1181,22 @@ class NoteModelTest {
         assertEquals(3_600_000L, moved.deletedAt)
         assertFalse(restored.deleted)
         assertNull(restored.deletedAt)
-        assertEquals("Moved to Trash 1h ago", trashed.trashLabel(now = 3_601_000))
+        assertEquals("Moved to Trash 1h ago • 30 days left", trashed.trashLabel(now = 3_601_000))
         assertEquals("In Trash", trashed.copy(deletedAt = null).trashLabel(now = 3_601_000))
         assertNull(SNote(title = "Active").trashLabel())
         assertEquals(1_000L, roundTrip.deletedAt)
         assertEquals(1_000L, trashed.toEntity().toNote().deletedAt)
+    }
+
+    @Test
+    fun trashRetentionLabelsShowReviewWindow() {
+        val dayMs = 24L * 60L * 60L * 1_000L
+        val deletedAt = 10_000L
+
+        assertEquals("30 days left", trashRetentionLabel(deletedAt, now = deletedAt))
+        assertEquals("1 day left", trashRetentionLabel(deletedAt, now = deletedAt + 29L * dayMs))
+        assertEquals("review window ended", trashRetentionLabel(deletedAt, now = deletedAt + 30L * dayMs))
+        assertEquals("review window ended", trashRetentionLabel(deletedAt, now = deletedAt + 45L * dayMs))
     }
 
     @Test

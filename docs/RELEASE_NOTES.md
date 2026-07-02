@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.4.3
+
+- Added Trash retention labels to deleted note cards so the recycle-bin view shows both deletion age and the remaining 30-day review window.
+- Added model tests for Trash retention wording at fresh, one-day-left, and expired review-window boundaries.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.2
 
 - Added Cornell and planner-style handwriting page templates alongside the existing plain, ruled, grid, and dotted paper styles.
