@@ -12,6 +12,7 @@
 - Grouped editor share/export actions into a compact overflow menu to reduce toolbar crowding.
 - Broadened Android share/import targets to text, image, audio, video, and application document MIME types.
 - Added meeting-note launcher shortcuts and widget quick actions.
+- Added per-note pinned Home screen shortcut requests from note cards and the editor overflow menu.
 
 Verification for this release is local build, unit-test, manifest/resource, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
 

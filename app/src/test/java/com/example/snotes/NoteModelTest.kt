@@ -460,6 +460,14 @@ class NoteModelTest {
     }
 
     @Test
+    fun pinnedNoteShortcutHelpersCreateStableLauncherLabels() {
+        assertEquals("pinned_note_note-42", pinnedNoteShortcutId("note-42"))
+        assertEquals("Untitled note", "   ".shortcutLabel(18))
+        assertEquals("Launch plan", " Launch   plan ".shortcutLabel(18))
+        assertEquals("Very long no...", "Very long note title for launcher".shortcutLabel(15))
+    }
+
+    @Test
     fun duplicateNoteCreatesIndependentCopyWithFreshMetadata() {
         val original = SNote(
             id = "source",

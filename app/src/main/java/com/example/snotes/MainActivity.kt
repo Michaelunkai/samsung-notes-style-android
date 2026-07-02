@@ -6,9 +6,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
 import android.graphics.BitmapFactory
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
+import android.graphics.drawable.Icon as AndroidIcon
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
@@ -189,6 +192,7 @@ import org.json.JSONObject
 const val ACTION_QUICK_NOTE = "com.example.snotes.action.QUICK_NOTE"
 const val EXTRA_QUICK_NOTE_KIND = "com.example.snotes.extra.QUICK_NOTE_KIND"
 const val EXTRA_OPEN_NOTE_ID = "com.example.snotes.extra.OPEN_NOTE_ID"
+const val PINNED_NOTE_SHORTCUT_PREFIX = "pinned_note_"
 const val SETTINGS_STORE = "notes_settings"
 const val SETTING_DARK_MODE = "dark_mode"
 const val SETTING_DEFAULT_NOTE_KIND = "default_note_kind"
@@ -1887,6 +1891,30 @@ fun Context.needsPostNotificationPermission(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
 
+fun pinnedNoteShortcutId(noteId: String): String = "$PINNED_NOTE_SHORTCUT_PREFIX$noteId"
+
+fun String.shortcutLabel(maxLength: Int): String {
+    val normalized = trim().ifBlank { "Untitled note" }.replace(Regex("""\s+"""), " ")
+    if (normalized.length <= maxLength) return normalized
+    return normalized.take((maxLength - 3).coerceAtLeast(1)).trimEnd() + "..."
+}
+
+fun requestPinnedNoteShortcut(context: Context, note: SNote): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+    val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return false
+    if (!shortcutManager.isRequestPinShortcutSupported) return false
+    val openIntent = Intent(context, MainActivity::class.java)
+        .setAction(Intent.ACTION_VIEW)
+        .putExtra(EXTRA_OPEN_NOTE_ID, note.id)
+    val shortcut = ShortcutInfo.Builder(context, pinnedNoteShortcutId(note.id))
+        .setShortLabel(note.title.shortcutLabel(18))
+        .setLongLabel(note.title.shortcutLabel(48))
+        .setIcon(AndroidIcon.createWithResource(context, R.mipmap.ic_launcher))
+        .setIntent(openIntent)
+        .build()
+    return shortcutManager.requestPinShortcut(shortcut, null)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = SequencedLaunchRequest(0, NoteLaunchRequest())) {
@@ -1954,6 +1982,10 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         viewModel.updateReminder(note, reminderAt)
+    }
+    val pinNoteToHome = { note: SNote ->
+        val requested = requestPinnedNoteShortcut(context, note)
+        viewModel.setStatus(if (requested) "Home screen shortcut requested" else "Launcher does not support pinned shortcuts")
     }
     val requestPinSetup = {
         settingsOpen = true
@@ -2242,6 +2274,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             },
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
+                            onPinToHome = { pinNoteToHome(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
                             onClearReminder = { updateReminderWithPermission(note, null) },
@@ -2284,6 +2317,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             },
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
+                            onPinToHome = { pinNoteToHome(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
                             onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
                             onClearReminder = { updateReminderWithPermission(note, null) },
@@ -2624,6 +2658,7 @@ fun NoteCard(
     onOpenLocked: () -> Unit,
     onDuplicate: () -> Unit,
     onTogglePinned: () -> Unit,
+    onPinToHome: () -> Unit,
     onToggleFavorite: () -> Unit,
     onSetReminderTomorrow: () -> Unit,
     onClearReminder: () -> Unit,
@@ -2713,6 +2748,14 @@ fun NoteCard(
                                 onClick = {
                                     menuOpen = false
                                     onTogglePinned()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Add to Home screen") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onPinToHome()
                                 }
                             )
                             DropdownMenuItem(
@@ -2870,6 +2913,10 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
         }
         viewModel.updateReminder(target, reminderAt)
     }
+    val pinNoteToHome = {
+        val requested = requestPinnedNoteShortcut(context, note)
+        viewModel.setStatus(if (requested) "Home screen shortcut requested" else "Launcher does not support pinned shortcuts")
+    }
     var editorSearchQuery by remember(note.id) { mutableStateOf("") }
     var activeSearchMatch by remember(note.id) { mutableStateOf(0) }
     val editorSearchMatches = remember(note, editorSearchQuery) { note.editorSearchMatches(editorSearchQuery) }
@@ -3016,6 +3063,14 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                                 onClick = {
                                     shareExportMenuOpen = false
                                     shareNoteText(context, note)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Add to Home screen") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+                                onClick = {
+                                    shareExportMenuOpen = false
+                                    pinNoteToHome()
                                 }
                             )
                             DropdownMenuItem(

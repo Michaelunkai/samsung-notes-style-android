@@ -25,7 +25,7 @@ Current local build version: `0.4.0`.
 - JSON backup export/import with schema/app/note-count metadata, source-aware import status, plus per-note plain text export/share, rich HTML export, and PDF export.
 - Android share targets for incoming text, images, audio, video, and application documents, with imported audio promoted to playable audio blocks.
 - Home-screen widget provider with latest-note preview, latest-note open target, and quick text/checklist/sticky/handwriting/meeting actions.
-- Static launcher shortcuts for quick text, checklist, sticky, handwriting, and meeting notes.
+- Static launcher shortcuts for quick text, checklist, sticky, handwriting, and meeting notes, plus per-note pinned Home screen shortcut requests from note actions.
 
 ## Important implementation notes
 
