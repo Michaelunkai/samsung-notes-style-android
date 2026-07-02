@@ -271,6 +271,7 @@ data class SNote(
     val reminderAt: Long? = null,
     val pageTemplate: PageTemplate = PageTemplate.Plain,
     val paperColor: Long = 0xFFFFFBF0,
+    val accentColor: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -296,7 +297,8 @@ fun SNote.editableContentEquals(other: SNote): Boolean =
         deletedAt == other.deletedAt &&
         reminderAt == other.reminderAt &&
         pageTemplate == other.pageTemplate &&
-        paperColor == other.paperColor
+        paperColor == other.paperColor &&
+        accentColor == other.accentColor
 
 sealed class NoteBlock(open val id: String, open val label: String) {
     data class Text(
@@ -498,6 +500,15 @@ val STICKY_NOTE_COLORS = listOf(
     0xFFBFDBFEL,
     0xFFFBCFE8L,
     0xFFE9D5FFL
+)
+
+val NOTE_ACCENT_COLORS = listOf(
+    0xFFFDE68AL,
+    0xFFBFDBFEL,
+    0xFFBBF7D0L,
+    0xFFFBCFE8L,
+    0xFFC4B5FDL,
+    0xFFFCA5A5L
 )
 
 const val TRASH_RETENTION_DAYS = 30
@@ -1182,6 +1193,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updatePageStyle(note: SNote, template: PageTemplate = note.pageTemplate, paperColor: Long = note.paperColor) {
         updateNote(note.copy(pageTemplate = template, paperColor = paperColor))
+    }
+
+    fun updateAccentColor(note: SNote, accentColor: Long?) {
+        updateNote(note.copy(accentColor = accentColor))
     }
 
     fun updateReminder(note: SNote, reminderAt: Long?) {
@@ -1982,6 +1997,9 @@ fun NoteBlock.suggestedTitleText(): String? = when (this) {
 
 fun SNote.cardMetaLabel(): String =
     "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • ${pageCountLabel()} • $folder"
+
+fun SNote.accentColorLabel(): String =
+    accentColor?.let { cssColor(it) } ?: "None"
 
 fun SNote.pageCountLabel(): String {
     val pages = blocks.count { it is NoteBlock.PageBreak } + 1
@@ -3420,6 +3438,14 @@ fun NoteCard(
         ),
         shape = RoundedCornerShape(8.dp)
     ) {
+        note.accentColor?.let { color ->
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .background(Color(color))
+            )
+        }
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (selected) {
@@ -4287,6 +4313,7 @@ fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 DetailRow("Folder", note.folder)
                 DetailRow("Tags", note.tags.joinToString(", ").ifBlank { "None" })
+                DetailRow("Color", note.accentColorLabel())
                 DetailRow("Reminder", note.reminderLabel() ?: "None")
                 DetailRow("Created", formatTimestamp(note.createdAt))
                 DetailRow("Modified", formatTimestamp(note.updatedAt))
@@ -4420,6 +4447,27 @@ fun NoteMetaEditor(
             }
             if (state.folders.isNotEmpty() || state.tags.isNotEmpty()) {
                 Text("Folders and tags update search and filter immediately.", style = MaterialTheme.typography.bodySmall)
+            }
+            Text("Note color", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                FilterChip(
+                    selected = note.accentColor == null,
+                    onClick = { viewModel.updateAccentColor(note, null) },
+                    label = { Text("None") }
+                )
+                NOTE_ACCENT_COLORS.forEach { color ->
+                    Box(
+                        Modifier
+                            .size(30.dp)
+                            .background(Color(color), CircleShape)
+                            .border(
+                                width = if (note.accentColor == color) 3.dp else 1.dp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                shape = CircleShape
+                            )
+                            .clickable { viewModel.updateAccentColor(note, color) }
+                    )
+                }
             }
             Text("Reminder", style = MaterialTheme.typography.labelLarge)
             Text(
@@ -5724,6 +5772,7 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("reminderAt", reminderAt ?: JSONObject.NULL)
     .put("pageTemplate", pageTemplate.name)
     .put("paperColor", paperColor)
+    .put("accentColor", accentColor ?: JSONObject.NULL)
     .put("createdAt", createdAt)
     .put("updatedAt", updatedAt)
 
@@ -5892,6 +5941,7 @@ fun JSONObject.toNote(): SNote = SNote(
     reminderAt = optNullableLong("reminderAt"),
     pageTemplate = optString("pageTemplate").toPageTemplate(PageTemplate.Plain),
     paperColor = optLong("paperColor", 0xFFFFFBF0),
+    accentColor = optNullableLong("accentColor"),
     createdAt = optLong("createdAt", System.currentTimeMillis()),
     updatedAt = optLong("updatedAt", System.currentTimeMillis())
 )

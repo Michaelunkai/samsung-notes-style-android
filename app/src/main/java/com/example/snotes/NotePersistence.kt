@@ -30,7 +30,8 @@ import org.json.JSONObject
         Index("pinned"),
         Index("favorite"),
         Index("archived"),
-        Index("reminderAt")
+        Index("reminderAt"),
+        Index("accentColor")
     ]
 )
 data class NoteEntity(
@@ -49,9 +50,10 @@ data class NoteEntity(
     val reminderAt: Long? = null,
     val pageTemplate: String = PageTemplate.Plain.name,
     val paperColor: Long = 0xFFFFFBF0,
+    val accentColor: Long? = null,
     val createdAt: Long,
     val updatedAt: Long,
-    val schemaVersion: Int = 6
+    val schemaVersion: Int = 7
 )
 
 @Dao
@@ -78,7 +80,7 @@ interface NoteDao {
     }
 }
 
-@Database(entities = [NoteEntity::class], version = 6, exportSchema = true)
+@Database(entities = [NoteEntity::class], version = 7, exportSchema = true)
 abstract class NotesDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 }
@@ -152,7 +154,7 @@ object NotesDatabaseProvider {
                 NotesDatabase::class.java,
                 "snotes.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration(false)
                 .build()
                 .also { instance = it }
@@ -192,6 +194,13 @@ object NotesDatabaseProvider {
             db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_archived ON notes(archived)")
         }
     }
+
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE notes ADD COLUMN accentColor INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_accentColor ON notes(accentColor)")
+        }
+    }
 }
 
 fun SNote.toEntity(): NoteEntity = NoteEntity(
@@ -210,6 +219,7 @@ fun SNote.toEntity(): NoteEntity = NoteEntity(
     reminderAt = reminderAt,
     pageTemplate = pageTemplate.name,
     paperColor = paperColor,
+    accentColor = accentColor,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -229,6 +239,7 @@ fun NoteEntity.toNote(): SNote = SNote(
     reminderAt = reminderAt,
     pageTemplate = pageTemplate.toPageTemplate(PageTemplate.Plain),
     paperColor = paperColor,
+    accentColor = accentColor,
     createdAt = createdAt,
     updatedAt = updatedAt
 )

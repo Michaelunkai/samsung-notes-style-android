@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.28
+
+- Added persisted note accent colors with selectable editor metadata controls and note-card color strips.
+- Preserved accent colors through JSON backup/import and Room persistence with a v7 migration.
+- Added regression coverage for JSON and Room round trips preserving note accent color metadata.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.27
 
 - Added home-screen library insight chips for active notes, folders, tags, task progress, reminder urgency, media count, locked notes, and automatic-backup status.

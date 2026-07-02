@@ -6,7 +6,7 @@ This plan is the exact checklist for the next Android-device approval gate. Do n
 
 ## Preconditions
 
-- Full local verification has passed for version `0.5.27`.
+- Full local verification has passed for version `0.5.28`.
 - Debug APK exists at `app\build\outputs\apk\debug\app-debug.apk`.
 - Package name is `com.example.snotes`.
 - If the device already has app data that should be preserved, export a backup from the installed app before uninstalling, clearing data, or replacing it.
@@ -49,6 +49,7 @@ If install fails because of a signature mismatch, stop and ask before uninstalli
 ### Rich Text And Page Tools
 
 - Apply bold, italic, underline, text color, highlight color, size preset, font family, and alignment.
+- Select a note accent color and verify the note-card color strip.
 - Change paper template to plain, ruled, grid, dotted, Cornell, and planner.
 - Change paper color.
 - Add page breaks and verify page count/export behavior.

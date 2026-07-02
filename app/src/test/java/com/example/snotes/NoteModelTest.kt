@@ -21,6 +21,7 @@ class NoteModelTest {
             reminderAt = 1_700_000_000_000,
             pageTemplate = PageTemplate.Cornell,
             paperColor = 0xFFEFF6FF,
+            accentColor = 0xFFBFDBFE,
             blocks = listOf(
                 NoteBlock.Text(
                     text = "Discuss release",
@@ -77,6 +78,7 @@ class NoteModelTest {
         assertEquals(1_700_000_000_000, restored.reminderAt)
         assertEquals(PageTemplate.Cornell, restored.pageTemplate)
         assertEquals(0xFFEFF6FF, restored.paperColor)
+        assertEquals(0xFFBFDBFE, restored.accentColor)
         assertEquals(7, restored.blocks.size)
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
         assertTrue((restored.blocks[0] as NoteBlock.Text).bold)
@@ -1376,6 +1378,7 @@ class NoteModelTest {
             reminderAt = 1_710_000_000_000,
             pageTemplate = PageTemplate.Planner,
             paperColor = 0xFFFFF8D6,
+            accentColor = 0xFFFBCFE8,
             blocks = listOf(
                 NoteBlock.Text(text = "Momentum notes", highlight = 0xFFFFFF00),
                 NoteBlock.Audio(
@@ -1410,6 +1413,7 @@ class NoteModelTest {
         assertEquals(1_710_000_000_000, restored.reminderAt)
         assertEquals(PageTemplate.Planner, restored.pageTemplate)
         assertEquals(0xFFFFF8D6, restored.paperColor)
+        assertEquals(0xFFFBCFE8, restored.accentColor)
         assertEquals("Momentum notes", restored.preview)
         assertEquals(3, restored.blocks.size)
         assertEquals("lecture.m4a", (restored.blocks[1] as NoteBlock.Audio).name)

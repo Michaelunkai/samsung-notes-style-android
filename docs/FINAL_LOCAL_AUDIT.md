@@ -7,7 +7,7 @@ This audit summarizes the implemented local Android application surface before o
 ## Current Build
 
 - App package: `com.example.snotes`
-- Local release: `0.5.27`
+- Local release: `0.5.28`
 - Debug APK: `app\build\outputs\apk\debug\app-debug.apk`
 - Required local proof command: `.\scripts\verify.ps1`
 - Equivalent Gradle proof tasks: `:app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
@@ -18,6 +18,7 @@ This audit summarizes the implemented local Android application surface before o
 
 - Persisted notes home screen with list/grid display.
 - Search, sort, and scoped filtering across visible note metadata.
+- Persisted note accent color strips for visual organization.
 - Library insight chips for active notes, folders, tags, task progress, reminder urgency, media count, locked-note count, and automatic-backup status.
 - Favorites, pinned notes, folders, tags, Archive, Trash, locked notes, and reminder-focused surfaces.
 - Contextual note creation from filtered views.
@@ -25,7 +26,7 @@ This audit summarizes the implemented local Android application surface before o
 
 ### Text And Rich Editing
 
-- Auto-persisted titles and mixed note blocks.
+- Auto-persisted titles, note accent colors, and mixed note blocks.
 - Rich text controls for bold, italic, underline, text color, highlight color, size presets, font family, and alignment.
 - Display-title-aware cards and search.
 - In-note search with match counts, snippets, previous/next navigation, active-match scrolling, and highlighted matches.
@@ -109,7 +110,7 @@ This audit summarizes the implemented local Android application surface before o
 ### Storage And Architecture
 
 - Kotlin Android application using Jetpack Compose.
-- Offline-first Room persistence.
+- Offline-first Room persistence with migration coverage through note accent colors.
 - First-run migration from the legacy JSON note store.
 - Indexed metadata for deleted, locked, reminder, and archived states.
 - Row-level Room upserts for common note edits and trash flows.
@@ -127,4 +128,4 @@ These are intentionally not claimed as complete in the local proof surface:
 
 ## Readiness Standard For The Device Gate
 
-The project is ready for the next controlled device gate only after the full local verification command passes for `0.5.27` and the debug APK exists. The device gate must follow `docs\DEVICE_TEST_PLAN.md` and must not start without explicit user approval.
+The project is ready for the next controlled device gate only after the full local verification command passes for `0.5.28` and the debug APK exists. The device gate must follow `docs\DEVICE_TEST_PLAN.md` and must not start without explicit user approval.
