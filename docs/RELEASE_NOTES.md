@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.5.3
+
+- Made PDF export treat page-break blocks as real logical page boundaries instead of rendering them only as text markers.
+- Added regression coverage for splitting PDF export lines into page groups at page-break markers.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.2
 
 - Rendered the selected paper color and page template behind the editor content so ruled, grid, dotted, Cornell, and planner styles are visible while editing.

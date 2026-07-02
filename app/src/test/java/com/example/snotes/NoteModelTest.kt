@@ -989,6 +989,23 @@ class NoteModelTest {
     }
 
     @Test
+    fun pdfPageBreaksSplitRenderedPdfLineGroups() {
+        val pages = listOf(
+            "Folder: Work",
+            "First page",
+            "[Page break]",
+            "Second page",
+            "[Page break]",
+            "Third page"
+        ).splitPdfLinesOnPageBreak()
+
+        assertEquals(3, pages.size)
+        assertEquals(listOf("Folder: Work", "First page"), pages[0])
+        assertEquals(listOf("Second page"), pages[1])
+        assertEquals(listOf("Third page"), pages[2])
+    }
+
+    @Test
     fun folderAndTagHelpersNormalizeOrganizationInput() {
         assertEquals("All notes", normalizeFolder("   "))
         assertEquals("Work/Product", normalizeFolder(" /Work//Product/ "))

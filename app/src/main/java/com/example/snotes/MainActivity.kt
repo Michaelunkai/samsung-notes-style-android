@@ -1905,6 +1905,18 @@ fun SNote.toPdfLines(maxLineLength: Int = 88): List<String> =
         .flatMap { line -> line.wrapLine(maxLineLength).asSequence() }
         .toList()
 
+fun List<String>.splitPdfLinesOnPageBreak(marker: String = "[Page break]"): List<List<String>> {
+    val pages = mutableListOf<MutableList<String>>(mutableListOf())
+    forEach { line ->
+        if (line == marker) {
+            pages += mutableListOf<String>()
+        } else {
+            pages.last() += line
+        }
+    }
+    return pages.map { it.toList() }.ifEmpty { listOf(emptyList()) }
+}
+
 fun String.wrapLine(maxLineLength: Int): List<String> {
     if (length <= maxLineLength || maxLineLength <= 8) return listOf(this)
     val words = split(Regex("""\s+"""))
@@ -2047,22 +2059,24 @@ fun writeNotePdf(context: Context, uri: Uri, note: SNote) {
         val margin = 48f
         val lineHeight = 18f
         val maxLinesPerPage = ((pageHeight - margin * 2) / lineHeight).toInt()
-        val lines = note.toPdfLines().drop(1).ifEmpty { listOf(" ") }
+        val logicalPages = note.toPdfLines().drop(1).splitPdfLinesOnPageBreak()
         var pageNumber = 1
-        lines.chunked(maxLinesPerPage).forEach { chunk ->
-            val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
-            val canvas = page.canvas
-            var y = margin
-            if (pageNumber == 1) {
-                canvas.drawText(note.displayTitle(), margin, y, titlePaint)
-                y += lineHeight * 1.5f
+        logicalPages.forEach { logicalPageLines ->
+            logicalPageLines.ifEmpty { listOf(" ") }.chunked(maxLinesPerPage).forEach { chunk ->
+                val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+                val canvas = page.canvas
+                var y = margin
+                if (pageNumber == 1) {
+                    canvas.drawText(note.displayTitle(), margin, y, titlePaint)
+                    y += lineHeight * 1.5f
+                }
+                chunk.forEach { line ->
+                    canvas.drawText(line, margin, y, bodyPaint)
+                    y += lineHeight
+                }
+                document.finishPage(page)
+                pageNumber += 1
             }
-            chunk.forEach { line ->
-                canvas.drawText(line, margin, y, bodyPaint)
-                y += lineHeight
-            }
-            document.finishPage(page)
-            pageNumber += 1
         }
         context.contentResolver.openOutputStream(uri)?.use { output ->
             document.writeTo(output)
