@@ -2,7 +2,7 @@
 
 Native Android prototype for a Samsung Notes-style note-taking app.
 
-Current local build version: `0.4.0`.
+Current local build version: `0.4.1`.
 
 ## Implemented in this workspace
 
