@@ -16,7 +16,7 @@ class NoteModelTest {
             pinned = true,
             favorite = true,
             reminderAt = 1_700_000_000_000,
-            pageTemplate = PageTemplate.Grid,
+            pageTemplate = PageTemplate.Cornell,
             paperColor = 0xFFEFF6FF,
             blocks = listOf(
                 NoteBlock.Text(
@@ -70,7 +70,7 @@ class NoteModelTest {
         assertTrue(restored.pinned)
         assertTrue(restored.favorite)
         assertEquals(1_700_000_000_000, restored.reminderAt)
-        assertEquals(PageTemplate.Grid, restored.pageTemplate)
+        assertEquals(PageTemplate.Cornell, restored.pageTemplate)
         assertEquals(0xFFEFF6FF, restored.paperColor)
         assertEquals(6, restored.blocks.size)
         assertEquals("Discuss release", (restored.blocks[0] as NoteBlock.Text).text)
@@ -304,12 +304,14 @@ class NoteModelTest {
 
     @Test
     fun storedNoteDefaultsFallbackToSupportedValues() {
-        val restored = noteDefaultsFromStoredValues("Meeting", "Grid", 0xFFFFF8D6)
+        val restored = noteDefaultsFromStoredValues("Meeting", "Cornell", 0xFFFFF8D6)
+        val caseInsensitive = noteDefaultsFromStoredValues("Text", "planner", DEFAULT_PAPER_COLORS.first())
         val fallback = noteDefaultsFromStoredValues("LegacyKind", "LegacyTemplate", 0xFF123456)
 
         assertEquals(NewNoteKind.Meeting, restored.newNoteKind)
-        assertEquals(PageTemplate.Grid, restored.pageTemplate)
+        assertEquals(PageTemplate.Cornell, restored.pageTemplate)
         assertEquals(0xFFFFF8D6, restored.paperColor)
+        assertEquals(PageTemplate.Planner, caseInsensitive.pageTemplate)
         assertEquals(NewNoteKind.Text, fallback.newNoteKind)
         assertEquals(PageTemplate.Plain, fallback.pageTemplate)
         assertEquals(DEFAULT_PAPER_COLORS.first(), fallback.paperColor)
@@ -1064,7 +1066,7 @@ class NoteModelTest {
             favorite = true,
             locked = true,
             reminderAt = 1_710_000_000_000,
-            pageTemplate = PageTemplate.Ruled,
+            pageTemplate = PageTemplate.Planner,
             paperColor = 0xFFFFF8D6,
             blocks = listOf(
                 NoteBlock.Text(text = "Momentum notes", highlight = 0xFFFFFF00),
@@ -1097,7 +1099,7 @@ class NoteModelTest {
         assertFalse(restored.deleted)
         assertNull(restored.deletedAt)
         assertEquals(1_710_000_000_000, restored.reminderAt)
-        assertEquals(PageTemplate.Ruled, restored.pageTemplate)
+        assertEquals(PageTemplate.Planner, restored.pageTemplate)
         assertEquals(0xFFFFF8D6, restored.paperColor)
         assertEquals("Momentum notes", restored.preview)
         assertEquals(3, restored.blocks.size)

@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.4.2
+
+- Added Cornell and planner-style handwriting page templates alongside the existing plain, ruled, grid, and dotted paper styles.
+- Preserved the new page templates through note JSON backup/import, Room entity mapping, and stored default-note preferences.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.1
 
 - Added per-note pinned Home screen shortcut requests from note cards and the editor overflow menu.

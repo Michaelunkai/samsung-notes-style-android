@@ -462,7 +462,9 @@ enum class PageTemplate(val label: String) {
     Plain("Plain"),
     Ruled("Ruled"),
     Grid("Grid"),
-    Dotted("Dotted")
+    Dotted("Dotted"),
+    Cornell("Cornell"),
+    Planner("Planner")
 }
 
 val DEFAULT_PAPER_COLORS = listOf(
@@ -4299,6 +4301,35 @@ fun DrawScope.drawPageTemplate(template: PageTemplate) {
                     x += 28f
                 }
                 y += 28f
+            }
+        }
+        PageTemplate.Cornell -> {
+            val cueColumnX = size.width * 0.28f
+            val summaryLineY = size.height * 0.78f
+            var y = 36f
+            while (y < summaryLineY) {
+                drawLine(templateColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                y += 34f
+            }
+            val guideColor = templateColor.copy(alpha = 0.95f)
+            drawLine(guideColor, start = Offset(cueColumnX, 0f), end = Offset(cueColumnX, summaryLineY), strokeWidth = 2f)
+            drawLine(guideColor, start = Offset(0f, summaryLineY), end = Offset(size.width, summaryLineY), strokeWidth = 2f)
+        }
+        PageTemplate.Planner -> {
+            val headerY = 58f
+            val sideColumnX = size.width * 0.62f
+            val guideColor = templateColor.copy(alpha = 0.95f)
+            drawLine(guideColor, start = Offset(0f, headerY), end = Offset(size.width, headerY), strokeWidth = 2f)
+            drawLine(guideColor, start = Offset(sideColumnX, headerY), end = Offset(sideColumnX, size.height), strokeWidth = 2f)
+            var y = headerY + 44f
+            while (y < size.height) {
+                drawLine(templateColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                y += 44f
+            }
+            var checklistY = headerY + 22f
+            while (checklistY < size.height) {
+                drawCircle(templateColor, radius = 4f, center = Offset(sideColumnX + 18f, checklistY))
+                checklistY += 44f
             }
         }
     }
