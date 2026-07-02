@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.5.2
+
+- Rendered the selected paper color and page template behind the editor content so ruled, grid, dotted, Cornell, and planner styles are visible while editing.
+- Reused the same template drawing logic from handwriting canvases for a consistent page and ink experience.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.1
 
 - Added smart display titles that fall back to the first meaningful text, checklist, sticky, attachment, audio, or handwriting content when a note is still untitled.

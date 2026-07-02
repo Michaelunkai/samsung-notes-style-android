@@ -3435,99 +3435,107 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
         if (detailsOpen) {
             NoteDetailsDialog(note = note, onDismiss = { detailsOpen = false })
         }
-        LazyColumn(
-            state = editorListState,
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(padding)
+                .background(Color(note.paperColor))
         ) {
-            item {
-                NoteMetaEditor(note, state, viewModel, onUpdateReminder = updateReminderWithPermission)
+            Canvas(Modifier.matchParentSize()) {
+                drawPageTemplate(note.pageTemplate)
             }
-            if (editorSearchOpen) {
+            LazyColumn(
+                state = editorListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 item {
-                    NoteSearchPanel(
-                        query = editorSearchQuery,
-                        matches = editorSearchMatches,
-                        activeMatchIndex = activeSearchMatch,
-                        onQueryChange = {
-                            editorSearchQuery = it
-                            activeSearchMatch = 0
-                        },
-                        onPrevious = {
-                            if (editorSearchMatches.isNotEmpty()) {
-                                activeSearchMatch =
-                                    (activeSearchMatch - 1 + editorSearchMatches.size) % editorSearchMatches.size
-                            }
-                        },
-                        onNext = {
-                            if (editorSearchMatches.isNotEmpty()) {
-                                activeSearchMatch = (activeSearchMatch + 1) % editorSearchMatches.size
-                            }
-                        },
-                        onClose = {
-                            editorSearchOpen = false
-                            editorSearchQuery = ""
-                            activeSearchMatch = 0
-                        }
-                    )
+                    NoteMetaEditor(note, state, viewModel, onUpdateReminder = updateReminderWithPermission)
                 }
-            }
-            itemsIndexed(note.blocks, key = { _, block -> block.id }) { index, block ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                    Column(
-                        modifier = Modifier.width(40.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        IconButton(
-                            enabled = index > 0,
-                            onClick = { viewModel.moveBlock(note, block.id, -1) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move block up")
-                        }
-                        IconButton(
-                            enabled = index < note.blocks.lastIndex,
-                            onClick = { viewModel.moveBlock(note, block.id, 1) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move block down")
-                        }
-                    }
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .then(
-                                if (block.id == activeSearchBlockId && editorSearchOpen) {
-                                    Modifier
-                                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                                        .padding(2.dp)
-                                } else {
-                                    Modifier
+                if (editorSearchOpen) {
+                    item {
+                        NoteSearchPanel(
+                            query = editorSearchQuery,
+                            matches = editorSearchMatches,
+                            activeMatchIndex = activeSearchMatch,
+                            onQueryChange = {
+                                editorSearchQuery = it
+                                activeSearchMatch = 0
+                            },
+                            onPrevious = {
+                                if (editorSearchMatches.isNotEmpty()) {
+                                    activeSearchMatch =
+                                        (activeSearchMatch - 1 + editorSearchMatches.size) % editorSearchMatches.size
                                 }
-                            )
-                    ) {
-                        when (block) {
-                            is NoteBlock.Text -> TextBlockEditor(note, block, viewModel)
-                            is NoteBlock.Checklist -> ChecklistBlockEditor(note, block, viewModel)
-                            is NoteBlock.Sticky -> StickyBlockEditor(note, block, viewModel)
-                            is NoteBlock.Drawing -> DrawingBlockEditor(note, block, viewModel)
-                            is NoteBlock.Attachment -> AttachmentBlock(note, block, viewModel)
-                            is NoteBlock.Audio -> AudioBlock(note, block, viewModel)
-                            is NoteBlock.PageBreak -> PageBreakBlock(
-                                note = note,
-                                block = block,
-                                pageNumber = note.blocks.take(index + 1).count { it is NoteBlock.PageBreak } + 1,
-                                viewModel = viewModel
-                            )
+                            },
+                            onNext = {
+                                if (editorSearchMatches.isNotEmpty()) {
+                                    activeSearchMatch = (activeSearchMatch + 1) % editorSearchMatches.size
+                                }
+                            },
+                            onClose = {
+                                editorSearchOpen = false
+                                editorSearchQuery = ""
+                                activeSearchMatch = 0
+                            }
+                        )
+                    }
+                }
+                itemsIndexed(note.blocks, key = { _, block -> block.id }) { index, block ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        Column(
+                            modifier = Modifier.width(40.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            IconButton(
+                                enabled = index > 0,
+                                onClick = { viewModel.moveBlock(note, block.id, -1) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move block up")
+                            }
+                            IconButton(
+                                enabled = index < note.blocks.lastIndex,
+                                onClick = { viewModel.moveBlock(note, block.id, 1) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move block down")
+                            }
+                        }
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .then(
+                                    if (block.id == activeSearchBlockId && editorSearchOpen) {
+                                        Modifier
+                                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                                            .padding(2.dp)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                        ) {
+                            when (block) {
+                                is NoteBlock.Text -> TextBlockEditor(note, block, viewModel)
+                                is NoteBlock.Checklist -> ChecklistBlockEditor(note, block, viewModel)
+                                is NoteBlock.Sticky -> StickyBlockEditor(note, block, viewModel)
+                                is NoteBlock.Drawing -> DrawingBlockEditor(note, block, viewModel)
+                                is NoteBlock.Attachment -> AttachmentBlock(note, block, viewModel)
+                                is NoteBlock.Audio -> AudioBlock(note, block, viewModel)
+                                is NoteBlock.PageBreak -> PageBreakBlock(
+                                    note = note,
+                                    block = block,
+                                    pageNumber = note.blocks.take(index + 1).count { it is NoteBlock.PageBreak } + 1,
+                                    viewModel = viewModel
+                                )
+                            }
                         }
                     }
                 }
-            }
-            item {
-                Spacer(Modifier.height(72.dp))
+                item {
+                    Spacer(Modifier.height(72.dp))
+                }
             }
         }
     }

@@ -2,14 +2,14 @@
 
 Native Android prototype for a Samsung Notes-style note-taking app.
 
-Current local build version: `0.5.1`.
+Current local build version: `0.5.2`.
 
 ## Implemented in this workspace
 
 - Kotlin Android project scaffold using Gradle Kotlin DSL and Jetpack Compose.
 - Notes home screen with persisted list/grid, smart content-derived display titles, sort, search-scope, and default note-type preferences, rich note-card metadata including checklist progress, reminder labels, Trash-age/retention labels with local expired-Trash pruning, and media summaries, expanded sorting including checklist-progress, reminder-soonest, media-first, trash-newest, and trash-review-ending modes, scoped search with clear action and active-scope summaries, contextual empty states, folders, tags, favorites, pinned notes, reminders, dedicated locked-notes and Archive views, trash with restore-all/empty-trash actions, light/dark mode, and multi-select actions including select-all-visible, batch duplicate, pin/unpin, favorite/unfavorite, archive/unarchive, and lock/unlock.
 - Folder and tag organization with note-count chips, nested folder rollups, filters, contextual note creation, bulk move/tag/untag actions, rename actions, folder deletion that moves notes back to All notes, and tag deletion that removes a tag from notes without deleting notes.
-- Editor screen with auto-persisted title, folder, tag, reminder, plain/ruled/grid/dotted/Cornell/planner templates, paper color, page breaks/page counts, meeting-note starter template, polished note details, mixed block changes, and capped note-level undo/redo.
+- Editor screen with auto-persisted title, folder, tag, reminder, visible plain/ruled/grid/dotted/Cornell/planner paper templates, paper color, page breaks/page counts, meeting-note starter template, polished note details, mixed block changes, and capped note-level undo/redo.
 - Reminder scheduling with Android alarm-backed notifications, reboot rescheduling, Android 13+ notification permission handling, notification tap-through to the note, and locked-note notification privacy.
 - In-note search panel with match counts, snippets, previous/next navigation, active-match scrolling, and highlighted matched blocks.
 - Rich text block controls for bold, italic, underline, text color, highlight color, size presets, font family, and alignment.
