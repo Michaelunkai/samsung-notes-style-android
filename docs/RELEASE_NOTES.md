@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.23
+
+- Added Export latest auto backup to the Settings backup section.
+- Reused Android's document picker for exporting the app-private latest automatic backup payload.
+- Tightened regression coverage for the no-backup summary state.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.22
 
 - Added automatic-backup status to Settings, including latest backup time, note count, and retained snapshot count.

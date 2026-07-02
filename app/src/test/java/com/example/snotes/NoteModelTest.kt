@@ -1715,7 +1715,9 @@ class NoteModelTest {
         val root = Files.createTempDirectory("snotes-backups-read").toFile()
         try {
             assertNull(readLatestAutoBackupText(root))
-            assertEquals("No automatic backup yet", autoBackupSummary(root).statusLabel())
+            val emptySummary = autoBackupSummary(root)
+            assertFalse(emptySummary.hasLatest)
+            assertEquals("No automatic backup yet", emptySummary.statusLabel())
 
             writeAutoBackupSnapshot(root, listOf(SNote(id = "latest", title = "Latest backup")), now = 1_000L)
             val restored = notesFromBackupJson(readLatestAutoBackupText(root).orEmpty())

@@ -1472,6 +1472,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportBackupText(): String = notesToBackupJson(_state.value.notes)
 
+    fun exportLatestAutoBackupText(): String? = repository.loadLatestAutoBackupText()
+
     fun restoreBackupText(rawBackup: String) {
         val metadata = backupMetadataFromJson(rawBackup)
         val imported = importableNotesFromBackupJson(rawBackup)
@@ -3936,7 +3938,21 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: () -> Unit) {
+    val context = LocalContext.current
     var notesPin by remember { mutableStateOf("") }
+    var pendingAutoBackupExportText by remember { mutableStateOf("") }
+    val autoBackupExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                writer.write(pendingAutoBackupExportText)
+            } ?: error("Unable to open automatic backup destination")
+        }.onSuccess {
+            viewModel.setStatus("Automatic backup exported")
+        }.onFailure {
+            viewModel.setStatus("Automatic backup export failed")
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Settings") },
@@ -4013,6 +4029,21 @@ fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: ()
                         Icon(Icons.Default.Description, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Restore auto backup")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val backupText = viewModel.exportLatestAutoBackupText()
+                            if (backupText.isNullOrBlank()) {
+                                viewModel.setStatus("No automatic backup found")
+                            } else {
+                                pendingAutoBackupExportText = backupText
+                                autoBackupExportLauncher.launch("snotes-auto-backup-latest-${System.currentTimeMillis()}.json")
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.AttachFile, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Export latest auto backup")
                     }
                 }
 
