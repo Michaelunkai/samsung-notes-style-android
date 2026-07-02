@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.5.14
+
+- Routed the multi-select Remind action through the same Android 13+ notification permission request path used by single-note reminders.
+- Kept batch reminder clearing unchanged, since it does not need notification permission.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.13
 
 - Added multi-select reminder actions so selected notes can be reminded tomorrow or have reminders cleared in one batch.

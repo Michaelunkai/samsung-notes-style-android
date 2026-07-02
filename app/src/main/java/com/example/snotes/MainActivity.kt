@@ -2348,6 +2348,13 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
         }
         viewModel.updateReminder(note, reminderAt)
     }
+    val batchReminderTomorrowWithPermission = {
+        val reminderAt = reminderPresetTimestamp(1)
+        if (context.needsPostNotificationPermission()) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        viewModel.batchUpdateReminderSelected(reminderAt)
+    }
     val pinNoteToHome = { note: SNote ->
         val requested = requestPinnedNoteShortcut(context, note)
         viewModel.setStatus(if (requested) "Home screen shortcut requested" else "Launcher does not support pinned shortcuts")
@@ -2599,7 +2606,12 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
             )
             Spacer(Modifier.height(8.dp))
             if (state.isSelectionMode) {
-                SelectionActionBar(state, viewModel, onRequestPinSetup = requestPinSetup)
+                SelectionActionBar(
+                    state = state,
+                    viewModel = viewModel,
+                    onRequestPinSetup = requestPinSetup,
+                    onRemindSelectedTomorrow = batchReminderTomorrowWithPermission
+                )
                 Spacer(Modifier.height(8.dp))
             }
             if (state.visibleNotes.isEmpty()) {
@@ -2752,7 +2764,12 @@ fun EmptyNotesState(copy: EmptyNotesCopy, onCreateNote: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequestPinSetup: () -> Unit) {
+fun SelectionActionBar(
+    state: NotesUiState,
+    viewModel: NotesViewModel,
+    onRequestPinSetup: () -> Unit,
+    onRemindSelectedTomorrow: () -> Unit
+) {
     val context = LocalContext.current
     var moveDialogOpen by remember { mutableStateOf(false) }
     var tagDialogOpen by remember { mutableStateOf(false) }
@@ -2935,7 +2952,7 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
                 }
             }
             if (state.selectedNotesIncludeNoReminder) {
-                Button(onClick = { viewModel.batchUpdateReminderSelected(reminderPresetTimestamp(1)) }) {
+                Button(onClick = onRemindSelectedTomorrow) {
                     Icon(Icons.Default.Notifications, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Remind")
