@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.15
+
+- Expanded the multi-select Remind action into a preset menu for Tomorrow, Next week, and Next month.
+- Kept every batch reminder preset on the Android notification permission-aware path.
+- Reduced toolbar clutter by keeping reminder choices inside one compact action.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.14
 
 - Routed the multi-select Remind action through the same Android 13+ notification permission request path used by single-note reminders.

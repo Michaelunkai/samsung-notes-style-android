@@ -2348,8 +2348,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
         }
         viewModel.updateReminder(note, reminderAt)
     }
-    val batchReminderTomorrowWithPermission = {
-        val reminderAt = reminderPresetTimestamp(1)
+    val batchReminderWithPermission = { daysFromNow: Int ->
+        val reminderAt = reminderPresetTimestamp(daysFromNow)
         if (context.needsPostNotificationPermission()) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -2610,7 +2610,7 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                     state = state,
                     viewModel = viewModel,
                     onRequestPinSetup = requestPinSetup,
-                    onRemindSelectedTomorrow = batchReminderTomorrowWithPermission
+                    onRemindSelected = batchReminderWithPermission
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -2768,13 +2768,14 @@ fun SelectionActionBar(
     state: NotesUiState,
     viewModel: NotesViewModel,
     onRequestPinSetup: () -> Unit,
-    onRemindSelectedTomorrow: () -> Unit
+    onRemindSelected: (Int) -> Unit
 ) {
     val context = LocalContext.current
     var moveDialogOpen by remember { mutableStateOf(false) }
     var tagDialogOpen by remember { mutableStateOf(false) }
     var removeTagDialogOpen by remember { mutableStateOf(false) }
     var exportMenuOpen by remember { mutableStateOf(false) }
+    var reminderMenuOpen by remember { mutableStateOf(false) }
     var pendingSelectedExportText by remember { mutableStateOf<String?>(null) }
     var pendingSelectedHtmlExportText by remember { mutableStateOf<String?>(null) }
     val shareableSelectedNotes = state.selectedExportableNotes
@@ -2952,10 +2953,38 @@ fun SelectionActionBar(
                 }
             }
             if (state.selectedNotesIncludeNoReminder) {
-                Button(onClick = onRemindSelectedTomorrow) {
-                    Icon(Icons.Default.Notifications, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Remind")
+                Box {
+                    Button(onClick = { reminderMenuOpen = true }) {
+                        Icon(Icons.Default.Notifications, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Remind")
+                    }
+                    DropdownMenu(expanded = reminderMenuOpen, onDismissRequest = { reminderMenuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Tomorrow") },
+                            leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                            onClick = {
+                                reminderMenuOpen = false
+                                onRemindSelected(1)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Next week") },
+                            leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                            onClick = {
+                                reminderMenuOpen = false
+                                onRemindSelected(7)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Next month") },
+                            leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                            onClick = {
+                                reminderMenuOpen = false
+                                onRemindSelected(30)
+                            }
+                        )
+                    }
                 }
             }
             if (state.selectedNotesIncludeReminder) {
