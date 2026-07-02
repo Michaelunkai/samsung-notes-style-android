@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.21
+
+- Added a Restore auto backup action to the home overflow backup tools.
+- Routed automatic-backup restores through the existing backup import merge path, so recovery is non-destructive and keeps current local-only notes unless a matching imported ID replaces them.
+- Added regression coverage for reading the latest automatic backup payload.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.20
 
 - Added app-private automatic backup snapshots after successful Room saves and deletes.

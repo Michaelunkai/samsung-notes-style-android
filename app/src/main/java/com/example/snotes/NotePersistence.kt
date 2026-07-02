@@ -126,6 +126,8 @@ class RoomNoteRepository(context: Context) {
         }
     }
 
+    fun loadLatestAutoBackupText(): String? = readLatestAutoBackupText(appContext.filesDir)
+
     private fun loadLegacyJson(): List<SNote> = runCatching {
         if (!legacyFile.exists()) return emptyList()
         val array = JSONArray(legacyFile.readText())
@@ -249,6 +251,14 @@ fun writeAutoBackupSnapshot(filesDir: File, notes: List<SNote>, now: Long = Syst
     }
     backupDir.pruneAutoBackupSnapshots()
 }
+
+fun readLatestAutoBackupText(filesDir: File): String? =
+    latestAutoBackupFile(filesDir)
+        .takeIf { it.isFile }
+        ?.readText()
+
+fun latestAutoBackupFile(filesDir: File): File =
+    File(File(filesDir, AUTO_BACKUP_DIR), AUTO_BACKUP_LATEST_FILE)
 
 fun File.autoBackupSnapshots(): List<File> =
     listFiles { file -> file.isFile && file.name.startsWith("snapshot-") && file.name.endsWith(".json") }

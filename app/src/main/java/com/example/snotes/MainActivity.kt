@@ -1487,6 +1487,15 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
+    fun restoreLatestAutoBackup() {
+        val rawBackup = repository.loadLatestAutoBackupText()
+        if (rawBackup.isNullOrBlank()) {
+            _state.update { it.copy(statusMessage = "No automatic backup found") }
+            return
+        }
+        restoreBackupText(rawBackup)
+    }
+
     fun importAttachmentIntoNote(noteId: String, sourceUri: String) {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
@@ -2447,6 +2456,14 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 onClick = {
                                     sortMenuOpen = false
                                     importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Restore auto backup") },
+                                leadingIcon = { Icon(Icons.Default.Description, null) },
+                                onClick = {
+                                    sortMenuOpen = false
+                                    viewModel.restoreLatestAutoBackup()
                                 }
                             )
                         }

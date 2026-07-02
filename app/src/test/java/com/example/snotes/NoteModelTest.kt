@@ -1711,6 +1711,21 @@ class NoteModelTest {
     }
 
     @Test
+    fun latestAutoBackupReaderReturnsBackupPayloadWhenPresent() {
+        val root = Files.createTempDirectory("snotes-backups-read").toFile()
+        try {
+            assertNull(readLatestAutoBackupText(root))
+
+            writeAutoBackupSnapshot(root, listOf(SNote(id = "latest", title = "Latest backup")), now = 1_000L)
+            val restored = notesFromBackupJson(readLatestAutoBackupText(root).orEmpty())
+
+            assertEquals(listOf("latest"), restored.map { it.id })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun lockedNotesHidePreviewContentFromSearch() {
         val state = NotesUiState(
             notes = listOf(
