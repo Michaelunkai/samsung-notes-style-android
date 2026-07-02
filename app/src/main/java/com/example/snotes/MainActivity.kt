@@ -833,6 +833,13 @@ enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
             .thenByDescending { it.mediaBlockCount() }
             .thenByDescending { it.updatedAt }
     ),
+    ColorGrouped(
+        "Color groups",
+        compareByDescending<SNote> { it.pinned }
+            .thenByDescending { it.favorite }
+            .thenBy { it.accentColor ?: Long.MAX_VALUE }
+            .thenBy { it.sortableDisplayTitle() }
+    ),
     TrashNewest(
         "Trash newest",
         compareByDescending<SNote> { it.pinned }

@@ -6,7 +6,7 @@ This plan is the exact checklist for the next Android-device approval gate. Do n
 
 ## Preconditions
 
-- Full local verification has passed for version `0.5.28`.
+- Full local verification has passed for version `0.5.29`.
 - Debug APK exists at `app\build\outputs\apk\debug\app-debug.apk`.
 - Package name is `com.example.snotes`.
 - If the device already has app data that should be preserved, export a backup from the installed app before uninstalling, clearing data, or replacing it.

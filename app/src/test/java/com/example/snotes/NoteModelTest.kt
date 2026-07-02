@@ -354,6 +354,7 @@ class NoteModelTest {
     @Test
     fun storedLibraryPreferencesFallbackToSupportedValues() {
         assertEquals(NoteSortMode.MediaHeavy, sortModeFromStoredValue("MediaHeavy"))
+        assertEquals(NoteSortMode.ColorGrouped, sortModeFromStoredValue("colorgrouped"))
         assertEquals(NoteSortMode.ChecklistProgress, sortModeFromStoredValue("checklistprogress"))
         assertEquals(NoteSortMode.ReminderSoonest, sortModeFromStoredValue("remindersoonest"))
         assertEquals(NoteSortMode.ModifiedNewest, sortModeFromStoredValue("LegacySort"))
@@ -1535,12 +1536,13 @@ class NoteModelTest {
     fun sortModesControlVisibleNoteOrdering() {
         val notes = listOf(
             SNote(title = "Beta", folder = "B", createdAt = 1, updatedAt = 1),
-            SNote(title = "Alpha", folder = "A", createdAt = 3, updatedAt = 3),
+            SNote(title = "Alpha", folder = "A", accentColor = 0xFFFFF8D6, createdAt = 3, updatedAt = 3),
             SNote(title = "Favorite", folder = "Z", favorite = true, createdAt = 2, updatedAt = 2),
             SNote(title = "Pinned", folder = "Z", pinned = true, createdAt = 1, updatedAt = 1),
             SNote(
                 title = "Tasks",
                 folder = "C",
+                accentColor = 0xFFFFF8D6,
                 createdAt = 4,
                 updatedAt = 4,
                 blocks = listOf(
@@ -1556,6 +1558,7 @@ class NoteModelTest {
             SNote(
                 title = "Media",
                 folder = "D",
+                accentColor = 0xFFE0F2FE,
                 createdAt = 5,
                 updatedAt = 5,
                 blocks = listOf(
@@ -1595,6 +1598,9 @@ class NoteModelTest {
 
         val mediaState = NotesUiState(notes = notes, sortMode = NoteSortMode.MediaHeavy)
         assertEquals(listOf("Pinned", "Favorite", "Media", "Agenda", "Tasks", "Alpha", "Beta"), mediaState.visibleNotes.map { it.displayTitle() })
+
+        val colorState = NotesUiState(notes = notes, sortMode = NoteSortMode.ColorGrouped)
+        assertEquals(listOf("Pinned", "Favorite", "Media", "Alpha", "Tasks", "Agenda", "Beta"), colorState.visibleNotes.map { it.displayTitle() })
     }
 
     @Test

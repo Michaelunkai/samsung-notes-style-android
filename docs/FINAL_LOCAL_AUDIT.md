@@ -7,7 +7,7 @@ This audit summarizes the implemented local Android application surface before o
 ## Current Build
 
 - App package: `com.example.snotes`
-- Local release: `0.5.28`
+- Local release: `0.5.29`
 - Debug APK: `app\build\outputs\apk\debug\app-debug.apk`
 - Required local proof command: `.\scripts\verify.ps1`
 - Equivalent Gradle proof tasks: `:app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
@@ -128,4 +128,4 @@ These are intentionally not claimed as complete in the local proof surface:
 
 ## Readiness Standard For The Device Gate
 
-The project is ready for the next controlled device gate only after the full local verification command passes for `0.5.28` and the debug APK exists. The device gate must follow `docs\DEVICE_TEST_PLAN.md` and must not start without explicit user approval.
+The project is ready for the next controlled device gate only after the full local verification command passes for `0.5.29` and the debug APK exists. The device gate must follow `docs\DEVICE_TEST_PLAN.md` and must not start without explicit user approval.

@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.29
+
+- Added a Color groups sort mode so note accent colors become a practical library organization tool.
+- Preserved pinned and favorite priority while grouping colored notes ahead of uncolored notes, then ordering groups by title.
+- Added regression coverage for stored sort preference restoration and visible-note ordering with accent colors.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.28
 
 - Added persisted note accent colors with selectable editor metadata controls and note-card color strips.
