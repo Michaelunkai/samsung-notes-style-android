@@ -448,6 +448,8 @@ class NoteModelTest {
         assertTrue(state.selectedNotesIncludeArchived)
         assertTrue(state.selectedNotesIncludeUnarchived)
         assertEquals(setOf("private"), state.selectedUnlockedLockedNoteIds)
+        assertEquals(listOf("private", "normal"), state.selectedExportableNotes.map { it.id })
+        assertEquals(1, state.selectedLockedNotesNeedingUnlockCount)
 
         val pinnedOnly = state.copy(selectedNoteIds = setOf("pinned"))
         assertFalse(pinnedOnly.selectedNotesIncludeUnpinned)
@@ -455,6 +457,8 @@ class NoteModelTest {
         assertFalse(pinnedOnly.selectedNotesIncludeUnlocked)
         assertFalse(pinnedOnly.selectedNotesIncludeUnarchived)
         assertTrue(pinnedOnly.selectedUnlockedLockedNoteIds.isEmpty())
+        assertTrue(pinnedOnly.selectedExportableNotes.isEmpty())
+        assertEquals(1, pinnedOnly.selectedLockedNotesNeedingUnlockCount)
     }
 
     @Test
@@ -786,6 +790,19 @@ class NoteModelTest {
         assertTrue(bundle.contains("\n\n---\n\nSecond"))
         assertTrue(bundle.contains("Tags: #shared"))
         assertTrue(bundle.contains("- [ ] Beta"))
+    }
+
+    @Test
+    fun selectedExportStatusMentionsSkippedLockedNotes() {
+        assertEquals("Sharing 1 note", selectedExportStatus("Sharing", exportedCount = 1, lockedSkippedCount = 0))
+        assertEquals(
+            "Exporting 2 notes; skipped 1 locked note",
+            selectedExportStatus("Exporting", exportedCount = 2, lockedSkippedCount = 1)
+        )
+        assertEquals(
+            "Exporting 3 notes; skipped 2 locked notes",
+            selectedExportStatus("Exporting", exportedCount = 3, lockedSkippedCount = 2)
+        )
     }
 
     @Test

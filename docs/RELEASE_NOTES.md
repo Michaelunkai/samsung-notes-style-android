@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.11
+
+- Added shared selection-state helpers for exportable selected notes and selected locked notes that still need unlocking.
+- Updated selected-note Share, TXT export, and HTML export status copy to report when locked notes were skipped.
+- Added regression coverage for exportable selection filtering and skipped-locked-note status messages.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.10
 
 - Added multi-select HTML export through Android's document picker.

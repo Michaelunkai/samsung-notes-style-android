@@ -682,6 +682,12 @@ data class NotesUiState(
             .map { it.id }
             .toSet()
 
+    val selectedExportableNotes: List<SNote>
+        get() = selectedNotes.filter { note -> !note.locked || note.id in unlockedNoteIds }
+
+    val selectedLockedNotesNeedingUnlockCount: Int
+        get() = selectedNotes.count { note -> note.locked && note.id !in unlockedNoteIds }
+
     val lockedCount: Int
         get() = notes.count { !it.deleted && !it.archived && it.locked }
 
@@ -2140,6 +2146,12 @@ fun shareNotesText(context: Context, notes: List<SNote>) {
     context.startActivity(Intent.createChooser(intent, "Share notes"))
 }
 
+fun selectedExportStatus(action: String, exportedCount: Int, lockedSkippedCount: Int): String {
+    val base = "$action $exportedCount note${if (exportedCount == 1) "" else "s"}"
+    if (lockedSkippedCount == 0) return base
+    return "$base; skipped $lockedSkippedCount locked note${if (lockedSkippedCount == 1) "" else "s"}"
+}
+
 fun writeNotePdf(context: Context, uri: Uri, note: SNote) {
     val document = PdfDocument()
     try {
@@ -2735,7 +2747,8 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
     var removeTagDialogOpen by remember { mutableStateOf(false) }
     var pendingSelectedExportText by remember { mutableStateOf<String?>(null) }
     var pendingSelectedHtmlExportText by remember { mutableStateOf<String?>(null) }
-    val shareableSelectedNotes = state.selectedNotes.filter { note -> !note.locked || note.id in state.unlockedNoteIds }
+    val shareableSelectedNotes = state.selectedExportableNotes
+    val lockedSkippedCount = state.selectedLockedNotesNeedingUnlockCount
     val selectedExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
         if (uri == null) {
             pendingSelectedExportText = null
@@ -2814,7 +2827,7 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
                     viewModel.setStatus("Unlock notes before sharing")
                 } else {
                     shareNotesText(context, shareableSelectedNotes)
-                    viewModel.setStatus("Sharing ${shareableSelectedNotes.size} note${if (shareableSelectedNotes.size == 1) "" else "s"}")
+                    viewModel.setStatus(selectedExportStatus("Sharing", shareableSelectedNotes.size, lockedSkippedCount))
                 }
             }
         ) {
@@ -2828,6 +2841,7 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
                     viewModel.setStatus("Unlock notes before exporting")
                 } else {
                     pendingSelectedExportText = shareableSelectedNotes.toPlainTextBundle()
+                    viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
                     selectedExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.txt")
                 }
             }
@@ -2842,6 +2856,7 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
                     viewModel.setStatus("Unlock notes before exporting")
                 } else {
                     pendingSelectedHtmlExportText = shareableSelectedNotes.toHtmlDocumentBundle()
+                    viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
                     selectedHtmlExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.html")
                 }
             }
