@@ -1656,6 +1656,7 @@ fun SNote.moveBlock(blockId: String, direction: Int): SNote {
 fun SNote.toPlainText(): String = buildString {
     appendLine(title)
     appendLine("Folder: $folder")
+    appendLine(pageStyleLabel())
     if (tags.isNotEmpty()) appendLine("Tags: ${tags.joinToString(", ") { "#$it" }}")
     reminderLabel()?.let { appendLine(it) }
     appendLine()
@@ -1670,6 +1671,7 @@ fun SNote.toHtmlDocument(): String {
     val pageColor = cssColor(paperColor)
     val tagHtml = tags.joinToString(" ") { """<span class="tag">#${it.escapeHtml()}</span>""" }
     val reminderHtml = reminderLabel()?.let { """<p class="meta">${it.escapeHtml()}</p>""" }.orEmpty()
+    val pageStyleHtml = pageStyleLabel().escapeHtml()
     val blocksHtml = blocks.joinToString("\n") { it.toHtml() }
     return """
         <!doctype html>
@@ -1696,6 +1698,7 @@ fun SNote.toHtmlDocument(): String {
           <main>
             <h1>${title.escapeHtml()}</h1>
             <p class="meta">Folder: ${folder.escapeHtml()}</p>
+            <p class="meta">$pageStyleHtml</p>
             ${if (tagHtml.isNotBlank()) """<p class="meta">$tagHtml</p>""" else ""}
             $reminderHtml
             $blocksHtml
@@ -1722,6 +1725,9 @@ fun SNote.details(): NoteDetails = NoteDetails(
     audioBlocks = blocks.count { it is NoteBlock.Audio },
     audioMarkers = blocks.filterIsInstance<NoteBlock.Audio>().sumOf { it.markers.size }
 )
+
+fun SNote.pageStyleLabel(): String =
+    "Page style: ${pageTemplate.label}, paper ${cssColor(paperColor)}"
 
 fun SNote.cardMetaLabel(): String =
     "${formatTimestamp(updatedAt)} • ${blocks.size} block${if (blocks.size == 1) "" else "s"} • $folder"

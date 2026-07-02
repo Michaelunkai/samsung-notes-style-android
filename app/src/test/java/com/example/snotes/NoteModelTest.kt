@@ -651,6 +651,8 @@ class NoteModelTest {
             title = "Sprint review",
             folder = "Work",
             tags = listOf("team", "export"),
+            pageTemplate = PageTemplate.Planner,
+            paperColor = 0xFFFFF8D6,
             blocks = listOf(
                 NoteBlock.Text(text = "Release summary"),
                 NoteBlock.Checklist(
@@ -682,6 +684,7 @@ class NoteModelTest {
 
         assertTrue(text.contains("Sprint review"))
         assertTrue(text.contains("Folder: Work"))
+        assertTrue(text.contains("Page style: Planner, paper #FFF8D6"))
         assertTrue(text.contains("Tags: #team, #export"))
         assertTrue(text.contains("Release summary"))
         assertTrue(text.contains("- [x] Demo"))
@@ -700,6 +703,7 @@ class NoteModelTest {
             title = "Sprint <review>",
             folder = "Work & Planning",
             tags = listOf("team", "export"),
+            pageTemplate = PageTemplate.Cornell,
             paperColor = 0xFFFFFBF0,
             reminderAt = 1_704_067_200_000,
             blocks = listOf(
@@ -743,6 +747,7 @@ class NoteModelTest {
         assertTrue(html.contains("<!doctype html>"))
         assertTrue(html.contains("Sprint &lt;review&gt;"))
         assertTrue(html.contains("Folder: Work &amp; Planning"))
+        assertTrue(html.contains("Page style: Cornell, paper #FFFBF0"))
         assertTrue(html.contains("#team"))
         assertTrue(html.contains("Overdue"))
         assertTrue(html.contains("Release &lt;summary&gt;"))
@@ -904,6 +909,8 @@ class NoteModelTest {
             title = "PDF plan",
             folder = "Work",
             tags = listOf("export"),
+            pageTemplate = PageTemplate.Grid,
+            paperColor = 0xFFEFF6FF,
             blocks = listOf(
                 NoteBlock.Text(text = "alpha beta gamma delta epsilon"),
                 NoteBlock.Checklist(items = listOf(CheckItem(text = "send file", checked = true)))
@@ -913,6 +920,9 @@ class NoteModelTest {
         val lines = note.toPdfLines(maxLineLength = 14)
 
         assertEquals("PDF plan", lines.first())
+        assertTrue(lines.contains("Page style:"))
+        assertTrue(lines.contains("Grid, paper"))
+        assertTrue(lines.contains("#EFF6FF"))
         assertTrue(lines.contains("Tags: #export"))
         assertTrue(lines.contains("alpha beta"))
         assertTrue(lines.contains("gamma delta"))

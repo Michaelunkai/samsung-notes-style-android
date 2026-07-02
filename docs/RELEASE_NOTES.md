@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.4.7
+
+- Added page template and paper color metadata to plain-text, rich HTML, and PDF-line exports so exported notes retain page-style context.
+- Added export tests for Planner, Cornell, and Grid page-style metadata across text, HTML, and PDF export paths.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.6
 
 - Hardened backup import so expired Trash notes from backups are skipped instead of being resurrected.
