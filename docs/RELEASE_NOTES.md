@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.5.7
+
+- Added character counts to the note details model and details dialog alongside existing word, page, block, checklist, ink, attachment, and audio summaries.
+- Added regression coverage for populated and empty character-count labels.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.6
 
 - Added a Share action to the multi-select toolbar so selected notes can be exported through Android's plain-text share sheet.

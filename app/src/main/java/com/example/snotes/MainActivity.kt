@@ -376,6 +376,7 @@ data class NoteDetails(
     val blockCount: Int,
     val pageBreaks: Int,
     val wordCount: Int,
+    val characterCount: Int,
     val checklistItems: Int,
     val completedChecklistItems: Int,
     val stickyNotes: Int,
@@ -392,6 +393,9 @@ data class NoteDetails(
 
     val wordLabel: String
         get() = "$wordCount word${if (wordCount == 1) "" else "s"}"
+
+    val characterLabel: String
+        get() = "$characterCount character${if (characterCount == 1) "" else "s"}"
 
     val checklistLabel: String
         get() = if (checklistItems == 0) "No checklist items" else "$completedChecklistItems/$checklistItems done"
@@ -1765,6 +1769,8 @@ fun SNote.details(): NoteDetails = NoteDetails(
     } + blocks.filterIsInstance<NoteBlock.Sticky>().sumOf { sticky ->
         sticky.text.split(Regex("""\s+""")).count { it.isNotBlank() }
     },
+    characterCount = blocks.filterIsInstance<NoteBlock.Text>().sumOf { it.text.length } +
+        blocks.filterIsInstance<NoteBlock.Sticky>().sumOf { it.text.length },
     checklistItems = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size },
     completedChecklistItems = blocks.filterIsInstance<NoteBlock.Checklist>().sumOf { checklist ->
         checklist.items.count { it.checked }
@@ -3765,6 +3771,7 @@ fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
                 DetailRow("Blocks", details.blockLabel)
                 DetailRow("Pages", details.pageLabel)
                 DetailRow("Words", details.wordLabel)
+                DetailRow("Characters", details.characterLabel)
                 DetailRow("Checklist", details.checklistLabel)
                 DetailRow("Sticky notes", details.stickyNotes.toString())
                 DetailRow("Ink", details.inkLabel)
