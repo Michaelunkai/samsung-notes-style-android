@@ -918,10 +918,14 @@ fun NotesUiState.libraryInsights(now: Long = System.currentTimeMillis()): List<L
     val overdueReminders = activeNotes.count { (it.reminderAt ?: Long.MAX_VALUE) < now }
     val upcomingReminders = activeNotes.count { (it.reminderAt ?: 0L) >= now }
     val mediaBlocks = activeNotes.sumOf { it.mediaBlockCount() }
+    val colorGroups = activeNotes.mapNotNull { it.accentColor }.distinct().size
     return buildList {
         add(LibraryInsight("Active", activeNotes.size.toString()))
         if (folders.isNotEmpty()) add(LibraryInsight("Folders", folders.size.toString()))
         if (tags.isNotEmpty()) add(LibraryInsight("Tags", tags.size.toString()))
+        if (colorGroups > 0) {
+            add(LibraryInsight("Colors", if (colorGroups == 1) "1 group" else "$colorGroups groups"))
+        }
         if (checklistTotal > 0) add(LibraryInsight("Tasks", "$checklistDone/$checklistTotal"))
         if (overdueReminders > 0) {
             add(LibraryInsight("Reminders", "$overdueReminders overdue"))

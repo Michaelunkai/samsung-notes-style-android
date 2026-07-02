@@ -1310,6 +1310,7 @@ class NoteModelTest {
                     title = "Launch",
                     folder = "Work/Product",
                     tags = listOf("release"),
+                    accentColor = 0xFFFFF8D6,
                     locked = true,
                     reminderAt = now - 1_000,
                     blocks = listOf(
@@ -1326,10 +1327,11 @@ class NoteModelTest {
                     title = "Audio",
                     folder = "Work",
                     tags = listOf("meeting"),
+                    accentColor = 0xFFE0F2FE,
                     reminderAt = now + 10_000,
                     blocks = listOf(NoteBlock.Audio(path = "/audio/clip.m4a", name = "clip.m4a"))
                 ),
-                SNote(title = "Archived", archived = true),
+                SNote(title = "Archived", accentColor = 0xFFFBCFE8, archived = true),
                 SNote(title = "Deleted", deleted = true)
             ),
             autoBackupSummary = AutoBackupSummary(latestModifiedAt = now, latestNoteCount = 4, snapshotCount = 2)
@@ -1340,6 +1342,7 @@ class NoteModelTest {
         assertEquals("2", insights["Active"])
         assertEquals("2", insights["Folders"])
         assertEquals("2", insights["Tags"])
+        assertEquals("2 groups", insights["Colors"])
         assertEquals("1/2", insights["Tasks"])
         assertEquals("1 overdue", insights["Reminders"])
         assertEquals("2", insights["Media"])
@@ -1362,6 +1365,7 @@ class NoteModelTest {
         assertEquals("2", insights["Active"])
         assertEquals("1 upcoming", insights["Reminders"])
         assertEquals("Not yet", insights["Backup"])
+        assertFalse(insights.containsKey("Colors"))
         assertFalse(insights.containsKey("Tasks"))
         assertFalse(insights.containsKey("Media"))
     }

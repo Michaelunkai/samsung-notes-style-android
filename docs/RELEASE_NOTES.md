@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.30
+
+- Added a Colors library insight chip that summarizes distinct active note accent-color groups.
+- Kept archived and deleted notes out of color insight counts so the home dashboard reflects the active library.
+- Added regression coverage for populated and absent color insight states.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.29
 
 - Added a Color groups sort mode so note accent colors become a practical library organization tool.
