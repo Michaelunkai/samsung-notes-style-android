@@ -1381,17 +1381,14 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun restoreBackupText(rawBackup: String) {
         val metadata = backupMetadataFromJson(rawBackup)
-        val imported = notesFromBackupJson(rawBackup)
+        val imported = importableNotesFromBackupJson(rawBackup)
         if (imported.isEmpty()) {
             _state.update { it.copy(statusMessage = "No notes found in backup") }
             return
         }
         _state.update { state ->
-            val importedIds = imported.map { it.id }.toSet()
-            val merged = (imported + state.notes.filterNot { it.id in importedIds })
-                .sortedWith(NoteSortMode.ModifiedNewest.comparator)
             state.copy(
-                notes = merged,
+                notes = mergeImportedNotes(state.notes, imported),
                 selectedNoteId = imported.firstOrNull()?.id,
                 statusMessage = backupImportStatus(imported.size, metadata)
             )
@@ -5025,6 +5022,15 @@ fun notesFromBackupJson(rawBackup: String): List<SNote> = runCatching {
     }
     notesArray.toNotes()
 }.getOrDefault(emptyList())
+
+fun importableNotesFromBackupJson(rawBackup: String, now: Long = System.currentTimeMillis()): List<SNote> =
+    notesFromBackupJson(rawBackup).deleteExpiredTrash(now)
+
+fun mergeImportedNotes(currentNotes: List<SNote>, importedNotes: List<SNote>): List<SNote> {
+    val importedIds = importedNotes.map { it.id }.toSet()
+    return (importedNotes + currentNotes.filterNot { it.id in importedIds })
+        .sortedWith(NoteSortMode.ModifiedNewest.comparator)
+}
 
 fun JSONArray.toNotes(): List<SNote> = buildList {
     for (i in 0 until length()) {

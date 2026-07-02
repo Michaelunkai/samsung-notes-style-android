@@ -1382,6 +1382,40 @@ class NoteModelTest {
     }
 
     @Test
+    fun backupImportSkipsExpiredTrashNotes() {
+        val deletedAt = 5_000L
+        val notes = listOf(
+            SNote(id = "active", title = "Active backup note", updatedAt = 3),
+            SNote(id = "recent-trash", title = "Recent trash", deleted = true, deletedAt = deletedAt + DAY_MS, updatedAt = 2),
+            SNote(id = "expired-trash", title = "Expired trash", deleted = true, deletedAt = deletedAt, updatedAt = 1)
+        )
+        val importable = importableNotesFromBackupJson(
+            notesToBackupJson(notes),
+            now = deletedAt + TRASH_RETENTION_DAYS * DAY_MS
+        )
+
+        assertEquals(listOf("active", "recent-trash"), importable.map { it.id })
+    }
+
+    @Test
+    fun backupImportMergeReplacesMatchingIdsAndKeepsLocalNotes() {
+        val current = listOf(
+            SNote(id = "same", title = "Local old", updatedAt = 1),
+            SNote(id = "local", title = "Local only", updatedAt = 4)
+        )
+        val imported = listOf(
+            SNote(id = "same", title = "Imported replacement", updatedAt = 5),
+            SNote(id = "new", title = "Imported new", updatedAt = 3)
+        )
+
+        val merged = mergeImportedNotes(current, imported)
+
+        assertEquals(listOf("Imported replacement", "Local only", "Imported new"), merged.map { it.title })
+        assertEquals(1, merged.count { it.id == "same" })
+        assertTrue(merged.any { it.id == "local" })
+    }
+
+    @Test
     fun backupImportStatusNamesSourceWhenMetadataExists() {
         assertEquals(
             "Imported 2 notes from S Notes Style backup v$BACKUP_SCHEMA_VERSION",

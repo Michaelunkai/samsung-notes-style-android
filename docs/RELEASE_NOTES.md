@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.4.6
+
+- Hardened backup import so expired Trash notes from backups are skipped instead of being resurrected.
+- Centralized imported-note merging so imported IDs replace matching local notes while unrelated local notes are preserved.
+- Added unit coverage for backup import pruning and merge ordering.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.5
 
 - Enforced the 30-day Trash review window locally by pruning expired deleted notes during startup before reminders and widgets are refreshed.
