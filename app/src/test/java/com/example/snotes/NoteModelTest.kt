@@ -1715,11 +1715,17 @@ class NoteModelTest {
         val root = Files.createTempDirectory("snotes-backups-read").toFile()
         try {
             assertNull(readLatestAutoBackupText(root))
+            assertEquals("No automatic backup yet", autoBackupSummary(root).statusLabel())
 
             writeAutoBackupSnapshot(root, listOf(SNote(id = "latest", title = "Latest backup")), now = 1_000L)
             val restored = notesFromBackupJson(readLatestAutoBackupText(root).orEmpty())
+            val summary = autoBackupSummary(root)
 
             assertEquals(listOf("latest"), restored.map { it.id })
+            assertEquals(1, summary.latestNoteCount)
+            assertEquals(1, summary.snapshotCount)
+            assertTrue(summary.statusLabel().contains("1 note"))
+            assertTrue(summary.statusLabel().contains("1 snapshot retained"))
         } finally {
             root.deleteRecursively()
         }

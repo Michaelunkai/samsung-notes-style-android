@@ -613,7 +613,8 @@ data class NotesUiState(
     val notePinDigest: String? = null,
     val unlockedNoteIds: Set<String> = emptySet(),
     val undoAvailableNoteIds: Set<String> = emptySet(),
-    val redoAvailableNoteIds: Set<String> = emptySet()
+    val redoAvailableNoteIds: Set<String> = emptySet(),
+    val autoBackupSummary: AutoBackupSummary = AutoBackupSummary()
 ) {
     val visibleNotes: List<SNote>
         get() = notes
@@ -903,7 +904,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             sortMode = sortModeFromStoredValue(settings.getString(SETTING_SORT_MODE, NoteSortMode.ModifiedNewest.name)),
             viewMode = viewModeFromStoredValue(settings.getString(SETTING_VIEW_MODE, NoteViewMode.List.name)),
             searchScope = searchScopeFromStoredValue(settings.getString(SETTING_SEARCH_SCOPE, SearchScope.All.name)),
-            notePinDigest = settings.getString(SETTING_NOTE_PIN_DIGEST, null)
+            notePinDigest = settings.getString(SETTING_NOTE_PIN_DIGEST, null),
+            autoBackupSummary = repository.autoBackupSummary()
         )
     )
     val state: StateFlow<NotesUiState> = _state
@@ -1543,6 +1545,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         val notes = _state.value.notes
         viewModelScope.launch(Dispatchers.IO) {
             repository.save(notes)
+            refreshAutoBackupSummary()
             scheduleAllNoteReminders(getApplication(), notes)
             refreshNotesWidgets(getApplication())
         }
@@ -1551,6 +1554,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     private fun persistNote(note: SNote) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.saveNote(note)
+            refreshAutoBackupSummary()
             scheduleNoteReminder(getApplication(), note)
             refreshNotesWidgets(getApplication())
         }
@@ -1560,8 +1564,13 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         if (ids.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             repository.deleteNotes(ids)
+            refreshAutoBackupSummary()
             refreshNotesWidgets(getApplication())
         }
+    }
+
+    private fun refreshAutoBackupSummary() {
+        _state.update { it.copy(autoBackupSummary = repository.autoBackupSummary()) }
     }
 
     private fun cleanupUnreferencedLocalFiles(removedBlocks: List<NoteBlock>) {
@@ -2006,6 +2015,13 @@ fun reminderPresetTimestamp(daysFromNow: Int, now: Long = System.currentTimeMill
 
 fun formatTimestamp(timestamp: Long): String =
     SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(timestamp))
+
+fun AutoBackupSummary.statusLabel(): String {
+    if (!hasLatest) return "No automatic backup yet"
+    val noteLabel = "$latestNoteCount note${if (latestNoteCount == 1) "" else "s"}"
+    val snapshotLabel = "$snapshotCount snapshot${if (snapshotCount == 1) "" else "s"}"
+    return "Latest ${formatTimestamp(latestModifiedAt ?: 0L)} • $noteLabel • $snapshotLabel retained"
+}
 
 fun SNote.toPdfLines(maxLineLength: Int = 88): List<String> =
     toPlainText()
@@ -3983,6 +3999,20 @@ fun SettingsDialog(state: NotesUiState, viewModel: NotesViewModel, onDismiss: ()
                         OutlinedButton(onClick = viewModel::clearNotesPin) {
                             Text("Remove PIN")
                         }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Backups", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        state.autoBackupSummary.statusLabel(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(onClick = viewModel::restoreLatestAutoBackup) {
+                        Icon(Icons.Default.Description, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Restore auto backup")
                     }
                 }
 

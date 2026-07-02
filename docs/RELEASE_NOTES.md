@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.22
+
+- Added automatic-backup status to Settings, including latest backup time, note count, and retained snapshot count.
+- Refreshed the backup summary after successful note saves and deletes.
+- Added regression coverage for automatic-backup summary labels and metadata.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.21
 
 - Added a Restore auto backup action to the home overflow backup tools.

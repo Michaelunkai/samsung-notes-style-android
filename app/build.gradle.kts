@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.snotes"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "0.5.21"
+        versionCode = 37
+        versionName = "0.5.22"
     }
 
     buildFeatures {

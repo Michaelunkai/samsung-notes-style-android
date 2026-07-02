@@ -128,6 +128,8 @@ class RoomNoteRepository(context: Context) {
 
     fun loadLatestAutoBackupText(): String? = readLatestAutoBackupText(appContext.filesDir)
 
+    fun autoBackupSummary(): AutoBackupSummary = autoBackupSummary(appContext.filesDir)
+
     private fun loadLegacyJson(): List<SNote> = runCatching {
         if (!legacyFile.exists()) return emptyList()
         val array = JSONArray(legacyFile.readText())
@@ -238,6 +240,15 @@ const val AUTO_BACKUP_LATEST_FILE = "latest.json"
 const val AUTO_BACKUP_MAX_SNAPSHOTS = 5
 const val AUTO_BACKUP_MIN_INTERVAL_MS = 10 * 60 * 1000L
 
+data class AutoBackupSummary(
+    val latestModifiedAt: Long? = null,
+    val latestNoteCount: Int = 0,
+    val snapshotCount: Int = 0
+) {
+    val hasLatest: Boolean
+        get() = latestModifiedAt != null
+}
+
 fun writeAutoBackupSnapshot(filesDir: File, notes: List<SNote>, now: Long = System.currentTimeMillis()) {
     val backupDir = File(filesDir, AUTO_BACKUP_DIR).apply { mkdirs() }
     val payload = notesToBackupJson(notes)
@@ -256,6 +267,18 @@ fun readLatestAutoBackupText(filesDir: File): String? =
     latestAutoBackupFile(filesDir)
         .takeIf { it.isFile }
         ?.readText()
+
+fun autoBackupSummary(filesDir: File): AutoBackupSummary {
+    val latest = latestAutoBackupFile(filesDir)
+    val snapshotCount = File(filesDir, AUTO_BACKUP_DIR).autoBackupSnapshots().size
+    if (!latest.isFile) return AutoBackupSummary(snapshotCount = snapshotCount)
+    val metadata = backupMetadataFromJson(latest.readText())
+    return AutoBackupSummary(
+        latestModifiedAt = latest.lastModified().takeIf { it > 0L },
+        latestNoteCount = metadata?.noteCount ?: notesFromBackupJson(latest.readText()).size,
+        snapshotCount = snapshotCount
+    )
+}
 
 fun latestAutoBackupFile(filesDir: File): File =
     File(File(filesDir, AUTO_BACKUP_DIR), AUTO_BACKUP_LATEST_FILE)
