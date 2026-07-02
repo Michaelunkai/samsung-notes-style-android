@@ -1190,13 +1190,31 @@ class NoteModelTest {
 
     @Test
     fun trashRetentionLabelsShowReviewWindow() {
-        val dayMs = 24L * 60L * 60L * 1_000L
         val deletedAt = 10_000L
 
         assertEquals("30 days left", trashRetentionLabel(deletedAt, now = deletedAt))
-        assertEquals("1 day left", trashRetentionLabel(deletedAt, now = deletedAt + 29L * dayMs))
-        assertEquals("review window ended", trashRetentionLabel(deletedAt, now = deletedAt + 30L * dayMs))
-        assertEquals("review window ended", trashRetentionLabel(deletedAt, now = deletedAt + 45L * dayMs))
+        assertEquals("1 day left", trashRetentionLabel(deletedAt, now = deletedAt + 29L * DAY_MS))
+        assertEquals("review window ended", trashRetentionLabel(deletedAt, now = deletedAt + 30L * DAY_MS))
+        assertEquals("review window ended", trashRetentionLabel(deletedAt, now = deletedAt + 45L * DAY_MS))
+    }
+
+    @Test
+    fun expiredTrashHelpersPruneOnlyExpiredDeletedNotes() {
+        val deletedAt = 100_000L
+        val active = SNote(id = "active", title = "Active", updatedAt = 4)
+        val recentTrash = SNote(id = "recent", title = "Recent", deleted = true, deletedAt = deletedAt + DAY_MS, updatedAt = 3)
+        val expiredTrash = SNote(id = "expired", title = "Expired", deleted = true, deletedAt = deletedAt, updatedAt = 2)
+        val undatedTrash = SNote(id = "undated", title = "Undated", deleted = true, deletedAt = null, updatedAt = 1)
+        val notes = listOf(active, recentTrash, expiredTrash, undatedTrash)
+        val now = deletedAt + TRASH_RETENTION_DAYS * DAY_MS
+
+        assertEquals(deletedAt + TRASH_RETENTION_DAYS * DAY_MS, expiredTrash.trashExpiresAt())
+        assertTrue(expiredTrash.isExpiredTrash(now))
+        assertFalse(recentTrash.isExpiredTrash(now))
+        assertFalse(active.isExpiredTrash(now))
+        assertFalse(undatedTrash.isExpiredTrash(now))
+        assertEquals(listOf("expired"), notes.expiredTrashNotes(now).map { it.id })
+        assertEquals(listOf("active", "recent", "undated"), notes.deleteExpiredTrash(now).map { it.id })
     }
 
     @Test

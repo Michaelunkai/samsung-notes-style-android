@@ -484,6 +484,7 @@ val STICKY_NOTE_COLORS = listOf(
 )
 
 const val TRASH_RETENTION_DAYS = 30
+const val DAY_MS = 24L * 60L * 60L * 1_000L
 
 data class NoteDefaults(
     val newNoteKind: NewNoteKind = NewNoteKind.Text,
@@ -1467,28 +1468,43 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun cleanupUnreferencedLocalFiles(removedBlocks: List<NoteBlock>) {
-        val app = getApplication<Application>()
+        val remainingNotes = _state.value.notes
+        val deletable = unreferencedLocalFiles(removedBlocks, remainingNotes, getApplication<Application>())
+        if (deletable.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            deletable.forEach { it.toFile(getApplication()).delete() }
+        }
+    }
+
+    private fun unreferencedLocalFiles(
+        removedBlocks: List<NoteBlock>,
+        remainingNotes: List<SNote>,
+        app: Application
+    ): List<LocalFileReference> {
         val removedRefs = removedBlocks
             .mapNotNull { it.localFileReference(app.packageName) }
             .distinct()
-        if (removedRefs.isEmpty()) return
-        val remainingRefs = _state.value.notes
+        if (removedRefs.isEmpty()) return emptyList()
+        val remainingRefs = remainingNotes
             .flatMap { note -> note.blocks.mapNotNull { it.localFileReference(app.packageName) } }
             .toSet()
-        val deletable = removedRefs.filterNot { it in remainingRefs }
-        if (deletable.isEmpty()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            deletable.forEach { it.toFile(app).delete() }
-        }
+        return removedRefs.filterNot { it in remainingRefs }
     }
 
     private fun loadInitialNotes(): List<SNote> = runBlocking(Dispatchers.IO) {
         val loaded = repository.load()
-        if (loaded.isNotEmpty()) {
+        val notes = if (loaded.isNotEmpty()) {
             loaded
         } else {
             listOf(sampleNote()).also { repository.save(it) }
         }
+        val expiredTrash = notes.expiredTrashNotes()
+        if (expiredTrash.isEmpty()) return@runBlocking notes
+        val kept = notes.deleteExpiredTrash()
+        repository.save(kept)
+        val app = getApplication<Application>()
+        unreferencedLocalFiles(expiredTrash.flatMap { it.blocks }, kept, app).forEach { it.toFile(app).delete() }
+        kept
     }
 
     private fun sampleNote() = SNote(
@@ -1753,14 +1769,19 @@ fun SNote.trashLabel(now: Long = System.currentTimeMillis()): String? =
     }
 
 fun trashRetentionLabel(deletedAt: Long, now: Long = System.currentTimeMillis()): String {
-    val dayMs = 24L * 60L * 60L * 1_000L
-    val retentionMs = TRASH_RETENTION_DAYS * dayMs
+    val retentionMs = TRASH_RETENTION_DAYS * DAY_MS
     val elapsedMs = (now - deletedAt).coerceAtLeast(0L)
     val remainingMs = (retentionMs - elapsedMs).coerceAtLeast(0L)
     if (remainingMs == 0L) return "review window ended"
-    val remainingDays = ((remainingMs + dayMs - 1L) / dayMs).coerceAtLeast(1L)
+    val remainingDays = ((remainingMs + DAY_MS - 1L) / DAY_MS).coerceAtLeast(1L)
     return "$remainingDays day${if (remainingDays == 1L) "" else "s"} left"
 }
+
+fun SNote.trashExpiresAt(): Long? =
+    if (deleted) deletedAt?.let { it + TRASH_RETENTION_DAYS * DAY_MS } else null
+
+fun SNote.isExpiredTrash(now: Long = System.currentTimeMillis()): Boolean =
+    trashExpiresAt()?.let { expiresAt -> now >= expiresAt } == true
 
 fun reminderTimestampLabel(timestamp: Long, now: Long = System.currentTimeMillis()): String {
     val prefix = if (timestamp < now) "Overdue" else "Reminder"
@@ -4853,6 +4874,12 @@ fun List<SNote>.deleteByIds(ids: Set<String>): List<SNote> =
 
 fun List<SNote>.deleteTrash(): List<SNote> =
     filterNot { it.deleted }
+
+fun List<SNote>.expiredTrashNotes(now: Long = System.currentTimeMillis()): List<SNote> =
+    filter { it.isExpiredTrash(now) }
+
+fun List<SNote>.deleteExpiredTrash(now: Long = System.currentTimeMillis()): List<SNote> =
+    filterNot { it.isExpiredTrash(now) }
 
 fun List<SNote>.restoreTrash(): List<SNote> =
     map { note -> if (note.deleted) note.restoreFromTrash() else note }

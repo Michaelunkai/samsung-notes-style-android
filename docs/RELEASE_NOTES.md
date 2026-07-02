@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.4.5
+
+- Enforced the 30-day Trash review window locally by pruning expired deleted notes during startup before reminders and widgets are refreshed.
+- Kept app-private attachment/audio cleanup reference-aware when expired Trash notes are pruned.
+- Added unit coverage for Trash expiry timestamps, expired-note filtering, and expired-note pruning.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.4
 
 - Added Trash-oriented sort modes for newest-deleted notes and review-window-ending notes.
