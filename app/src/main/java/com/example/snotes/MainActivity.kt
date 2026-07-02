@@ -333,7 +333,8 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         val name: String,
         val mimeHint: String = "file",
         val sizeBytes: Long = 0L,
-        val pageCount: Int = 0
+        val pageCount: Int = 0,
+        val caption: String = ""
     ) : NoteBlock(id, "Attachment")
 
     data class Audio(
@@ -1766,7 +1767,13 @@ fun NoteBlock.toPlainText(): String = when (this) {
         "${if (item.checked) "- [x]" else "- [ ]"} ${item.text.ifBlank { "Checklist item" }}"
     }
     is NoteBlock.Drawing -> "[Handwriting: ${strokes.size} stroke${if (strokes.size == 1) "" else "s"}]"
-    is NoteBlock.Attachment -> "[Attachment: $name${exportDetailLabel.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
+    is NoteBlock.Attachment -> buildString {
+        append("[Attachment: $name${exportDetailLabel.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]")
+        caption.trim().takeIf { it.isNotBlank() }?.let {
+            appendLine()
+            append("Caption: $it")
+        }
+    }
     is NoteBlock.Audio -> buildString {
         append("[Audio: $name${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]")
         markers.forEach { marker ->
@@ -1799,7 +1806,12 @@ fun NoteBlock.toHtml(): String = when (this) {
     }
     is NoteBlock.Sticky -> """<section class="block sticky" style="background: ${cssColor(color)}">${text.ifBlank { "Empty sticky note" }.escapeHtml()}</section>"""
     is NoteBlock.Drawing -> """<section class="block media">Handwriting: ${strokes.size} stroke${if (strokes.size == 1) "" else "s"}</section>"""
-    is NoteBlock.Attachment -> """<section class="block media">Attachment: ${name.escapeHtml()}${exportDetailLabel.takeIf { it.isNotBlank() }?.let { " (${it.escapeHtml()})" }.orEmpty()}</section>"""
+    is NoteBlock.Attachment -> {
+        val captionHtml = caption.trim().takeIf { it.isNotBlank() }
+            ?.let { """<p class="caption">${it.escapeHtml()}</p>""" }
+            .orEmpty()
+        """<section class="block media">Attachment: ${name.escapeHtml()}${exportDetailLabel.takeIf { it.isNotBlank() }?.let { " (${it.escapeHtml()})" }.orEmpty()}$captionHtml</section>"""
+    }
     is NoteBlock.Audio -> {
         val markersHtml = markers.takeIf { it.isNotEmpty() }?.joinToString("\n", prefix = """<ul class="markers">""", postfix = "</ul>") { marker ->
             """<li>${formatDuration(marker.timestampMs).escapeHtml()} ${marker.label.escapeHtml()}</li>"""
@@ -4305,6 +4317,15 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
                     Icon(Icons.Default.Delete, "Delete attachment")
                 }
             }
+            OutlinedTextField(
+                value = block.caption,
+                onValueChange = { viewModel.updateBlock(note, block.copy(caption = it)) },
+                label = { Text("Caption") },
+                placeholder = { Text("Add context for this attachment") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 1,
+                maxLines = 3
+            )
         }
     }
 }
@@ -4633,9 +4654,15 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
         is NoteBlock.Attachment -> if (
             block.name.contains(normalized, ignoreCase = true) ||
                     block.mimeHint.contains(normalized, ignoreCase = true) ||
-                    block.pageCountLabel.contains(normalized, ignoreCase = true)
+                    block.pageCountLabel.contains(normalized, ignoreCase = true) ||
+                    block.caption.contains(normalized, ignoreCase = true)
                 ) {
-                    add(EditorSearchMatch(block.id, if (block.isPdfAttachment) "PDF attachment" else "Attachment", block.name.searchSnippet(normalized)))
+                    val snippet = if (block.caption.contains(normalized, ignoreCase = true)) {
+                        block.caption.searchSnippet(normalized)
+                    } else {
+                        block.name.searchSnippet(normalized)
+                    }
+                    add(EditorSearchMatch(block.id, if (block.isPdfAttachment) "PDF attachment" else "Attachment", snippet))
                 }
                 is NoteBlock.Audio -> {
                     if (
@@ -4685,9 +4712,16 @@ fun NoteBlock.attachmentSearchLabels(query: String): List<String> = when (this) 
     is NoteBlock.Attachment -> if (
         name.contains(query, ignoreCase = true) ||
         mimeHint.contains(query, ignoreCase = true) ||
-        pageCountLabel.contains(query, ignoreCase = true)
+        pageCountLabel.contains(query, ignoreCase = true) ||
+        caption.contains(query, ignoreCase = true)
     ) {
-        listOf("${if (isPdfAttachment) "PDF" else "File"}: $name")
+        listOf(
+            if (caption.contains(query, ignoreCase = true)) {
+                "${if (isPdfAttachment) "PDF" else "File"} caption: ${caption.searchSnippet(query)}"
+            } else {
+                "${if (isPdfAttachment) "PDF" else "File"}: $name"
+            }
+        )
     } else {
         emptyList()
     }
@@ -4927,6 +4961,7 @@ fun NoteBlock.toJson(): JSONObject {
             .put("mimeHint", mimeHint)
             .put("sizeBytes", sizeBytes)
             .put("pageCount", pageCount)
+            .put("caption", caption)
 
         is NoteBlock.Audio -> json
             .put("type", "audio")
@@ -5010,7 +5045,8 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         name = optString("name", "Attachment"),
         mimeHint = optString("mimeHint", "file"),
         sizeBytes = optLong("sizeBytes", 0L),
-        pageCount = optInt("pageCount", 0)
+        pageCount = optInt("pageCount", 0),
+        caption = optString("caption")
     )
 
     "audio" -> NoteBlock.Audio(
