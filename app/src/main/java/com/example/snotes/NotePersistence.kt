@@ -28,6 +28,7 @@ import org.json.JSONObject
         Index("deletedAt"),
         Index("pinned"),
         Index("favorite"),
+        Index("archived"),
         Index("reminderAt")
     ]
 )
@@ -41,6 +42,7 @@ data class NoteEntity(
     val pinned: Boolean = false,
     val favorite: Boolean,
     val locked: Boolean,
+    val archived: Boolean = false,
     val deleted: Boolean,
     val deletedAt: Long? = null,
     val reminderAt: Long? = null,
@@ -48,7 +50,7 @@ data class NoteEntity(
     val paperColor: Long = 0xFFFFFBF0,
     val createdAt: Long,
     val updatedAt: Long,
-    val schemaVersion: Int = 5
+    val schemaVersion: Int = 6
 )
 
 @Dao
@@ -75,7 +77,7 @@ interface NoteDao {
     }
 }
 
-@Database(entities = [NoteEntity::class], version = 5, exportSchema = true)
+@Database(entities = [NoteEntity::class], version = 6, exportSchema = true)
 abstract class NotesDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 }
@@ -138,7 +140,7 @@ object NotesDatabaseProvider {
                 NotesDatabase::class.java,
                 "snotes.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration(false)
                 .build()
                 .also { instance = it }
@@ -171,6 +173,13 @@ object NotesDatabaseProvider {
             db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_deletedAt ON notes(deletedAt)")
         }
     }
+
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE notes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_archived ON notes(archived)")
+        }
+    }
 }
 
 fun SNote.toEntity(): NoteEntity = NoteEntity(
@@ -183,6 +192,7 @@ fun SNote.toEntity(): NoteEntity = NoteEntity(
     pinned = pinned,
     favorite = favorite,
     locked = locked,
+    archived = archived,
     deleted = deleted,
     deletedAt = deletedAt,
     reminderAt = reminderAt,
@@ -201,6 +211,7 @@ fun NoteEntity.toNote(): SNote = SNote(
     pinned = pinned,
     favorite = favorite,
     locked = locked,
+    archived = archived,
     deleted = deleted,
     deletedAt = deletedAt,
     reminderAt = reminderAt,

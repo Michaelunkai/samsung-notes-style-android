@@ -71,6 +71,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckBox
@@ -264,6 +265,7 @@ data class SNote(
     val pinned: Boolean = false,
     val favorite: Boolean = false,
     val locked: Boolean = false,
+    val archived: Boolean = false,
     val deleted: Boolean = false,
     val deletedAt: Long? = null,
     val reminderAt: Long? = null,
@@ -289,6 +291,7 @@ fun SNote.editableContentEquals(other: SNote): Boolean =
         pinned == other.pinned &&
         favorite == other.favorite &&
         locked == other.locked &&
+        archived == other.archived &&
         deleted == other.deleted &&
         deletedAt == other.deletedAt &&
         reminderAt == other.reminderAt &&
@@ -604,10 +607,11 @@ data class NotesUiState(
         get() = notes
             .filter { note ->
                 when (surface) {
-                    NotesSurface.All, NotesSurface.Folders, NotesSurface.Tags -> !note.deleted
-                    NotesSurface.Favorites -> !note.deleted && note.favorite
-                    NotesSurface.Reminders -> !note.deleted && note.reminderAt != null
-                    NotesSurface.Locked -> !note.deleted && note.locked
+                    NotesSurface.All, NotesSurface.Folders, NotesSurface.Tags -> !note.deleted && !note.archived
+                    NotesSurface.Favorites -> !note.deleted && !note.archived && note.favorite
+                    NotesSurface.Reminders -> !note.deleted && !note.archived && note.reminderAt != null
+                    NotesSurface.Locked -> !note.deleted && !note.archived && note.locked
+                    NotesSurface.Archived -> !note.deleted && note.archived
                     NotesSurface.Trash -> note.deleted
                 }
             }
@@ -654,41 +658,50 @@ data class NotesUiState(
     val selectedNotesIncludeUnlocked: Boolean
         get() = selectedNotes.any { !it.locked }
 
+    val selectedNotesIncludeArchived: Boolean
+        get() = selectedNotes.any { it.archived }
+
+    val selectedNotesIncludeUnarchived: Boolean
+        get() = selectedNotes.any { !it.archived }
+
     val lockedCount: Int
-        get() = notes.count { !it.deleted && it.locked }
+        get() = notes.count { !it.deleted && !it.archived && it.locked }
 
     val folders: List<String>
-        get() = notes.filter { !it.deleted }.map { it.folder }.distinct().sorted()
+        get() = notes.filter { !it.deleted && !it.archived }.map { it.folder }.distinct().sorted()
 
     val rootFolders: List<String>
         get() = folders.map { it.substringBefore("/") }.distinct().sorted()
 
     val folderSummaries: List<OrganizationSummary>
         get() = folders.map { folder ->
-            OrganizationSummary(folder, notes.count { !it.deleted && (it.folder == folder || it.folder.startsWith("$folder/")) })
+            OrganizationSummary(folder, notes.count { !it.deleted && !it.archived && (it.folder == folder || it.folder.startsWith("$folder/")) })
         }.filter { it.noteCount > 0 }
 
     val rootFolderSummaries: List<OrganizationSummary>
         get() = rootFolders.map { folder ->
-            OrganizationSummary(folder, notes.count { !it.deleted && (it.folder == folder || it.folder.startsWith("$folder/")) })
+            OrganizationSummary(folder, notes.count { !it.deleted && !it.archived && (it.folder == folder || it.folder.startsWith("$folder/")) })
         }.filter { it.noteCount > 0 }
 
     val tags: List<String>
-        get() = notes.filter { !it.deleted }.flatMap { it.tags }.distinct().sorted()
+        get() = notes.filter { !it.deleted && !it.archived }.flatMap { it.tags }.distinct().sorted()
 
     val tagSummaries: List<OrganizationSummary>
         get() = tags.map { tag ->
-            OrganizationSummary(tag, notes.count { !it.deleted && tag in it.tags })
+            OrganizationSummary(tag, notes.count { !it.deleted && !it.archived && tag in it.tags })
         }.filter { it.noteCount > 0 }
 
     val trashCount: Int
         get() = notes.count { it.deleted }
 
     val favoritesCount: Int
-        get() = notes.count { !it.deleted && it.favorite }
+        get() = notes.count { !it.deleted && !it.archived && it.favorite }
 
     val reminderCount: Int
-        get() = notes.count { !it.deleted && it.reminderAt != null }
+        get() = notes.count { !it.deleted && !it.archived && it.reminderAt != null }
+
+    val archivedCount: Int
+        get() = notes.count { !it.deleted && it.archived }
 
     val hasNotePin: Boolean
         get() = !notePinDigest.isNullOrBlank()
@@ -712,6 +725,7 @@ enum class NotesSurface(val label: String) {
     Favorites("Favorites"),
     Reminders("Reminders"),
     Locked("Locked notes"),
+    Archived("Archive"),
     Trash("Trash")
 }
 
@@ -823,6 +837,10 @@ fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
             "Set a Notes PIN in Settings before creating private notes."
         },
         actionLabel = if (hasNotePin) noteDefaults.newNoteKind.title else null
+    )
+    surface == NotesSurface.Archived -> EmptyNotesCopy(
+        title = "Archive is empty",
+        subtitle = "Archive notes you want to keep out of the main list without deleting them."
     )
     surface == NotesSurface.Folders && folderFilter != null -> EmptyNotesCopy(
         title = "No notes in $folderFilter",
@@ -953,7 +971,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         _state.update {
             when (surface) {
                 NotesSurface.All -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
-                NotesSurface.Favorites, NotesSurface.Reminders, NotesSurface.Locked, NotesSurface.Trash -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
+                NotesSurface.Favorites, NotesSurface.Reminders, NotesSurface.Locked, NotesSurface.Archived, NotesSurface.Trash -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
                 NotesSurface.Folders -> it.copy(surface = surface, tagFilter = null, folderFilter = it.folderFilter ?: it.rootFolders.firstOrNull() ?: it.folders.firstOrNull())
                 NotesSurface.Tags -> it.copy(surface = surface, folderFilter = null, tagFilter = it.tagFilter ?: it.tags.firstOrNull())
             }
@@ -1118,6 +1136,16 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         updateNote(note.copy(pinned = !note.pinned))
     }
 
+    fun archiveNote(note: SNote) {
+        updateNote(note.copy(archived = true, pinned = false))
+        _state.update { it.copy(selectedNoteId = null, statusMessage = "Note archived") }
+    }
+
+    fun unarchiveNote(note: SNote) {
+        updateNote(note.copy(archived = false))
+        _state.update { it.copy(statusMessage = "Note restored from Archive") }
+    }
+
     fun duplicateNote(note: SNote) {
         val duplicate = note.duplicate()
         _state.update { it.copy(notes = listOf(duplicate) + it.notes, selectedNoteId = duplicate.id, selectedNoteIds = emptySet()) }
@@ -1211,6 +1239,14 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun batchPinSelected(pinned: Boolean) {
         updateSelectedNotes(if (pinned) "Pinned selected notes" else "Unpinned selected notes") { it.copy(pinned = pinned) }
+    }
+
+    fun batchArchiveSelected() {
+        updateSelectedNotes("Archived selected notes") { it.copy(archived = true, pinned = false) }
+    }
+
+    fun batchUnarchiveSelected() {
+        updateSelectedNotes("Restored selected notes from Archive") { it.copy(archived = false) }
     }
 
     fun batchLockSelected(locked: Boolean) {
@@ -1600,6 +1636,7 @@ fun SNote.duplicate(now: Long = System.currentTimeMillis()): SNote = copy(
     blocks = blocks.map { it.duplicateBlock() },
     pinned = false,
     favorite = false,
+    archived = false,
     deleted = false,
     deletedAt = null,
     reminderAt = null,
@@ -1608,7 +1645,7 @@ fun SNote.duplicate(now: Long = System.currentTimeMillis()): SNote = copy(
 )
 
 fun SNote.moveToTrash(deletedAt: Long = System.currentTimeMillis()): SNote =
-    copy(deleted = true, deletedAt = deletedAt)
+    copy(deleted = true, archived = false, deletedAt = deletedAt)
 
 fun SNote.restoreFromTrash(): SNote =
     copy(deleted = false, deletedAt = null)
@@ -2424,6 +2461,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onPinToHome = { pinNoteToHome(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onArchive = { viewModel.archiveNote(note) },
+                            onUnarchive = { viewModel.unarchiveNote(note) },
                             onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
                             onClearReminder = { updateReminderWithPermission(note, null) },
                             onToggleLock = {
@@ -2467,6 +2506,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onPinToHome = { pinNoteToHome(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
+                            onArchive = { viewModel.archiveNote(note) },
+                            onUnarchive = { viewModel.unarchiveNote(note) },
                             onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
                             onClearReminder = { updateReminderWithPermission(note, null) },
                             onToggleLock = {
@@ -2584,6 +2625,13 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             Button(onClick = viewModel::batchDeleteSelectedPermanently) {
                 Text("Delete")
             }
+        } else if (state.surface == NotesSurface.Archived) {
+            Button(onClick = viewModel::batchUnarchiveSelected) {
+                Text("Unarchive")
+            }
+            Button(onClick = viewModel::batchMoveSelectedToTrash) {
+                Text("Trash")
+            }
         } else {
             Button(onClick = { moveDialogOpen = true }) {
                 Text("Move")
@@ -2612,6 +2660,11 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             if (state.selectedNotesIncludeFavorite) {
                 Button(onClick = { viewModel.batchFavoriteSelected(false) }) {
                     Text("Unfavorite")
+                }
+            }
+            if (state.selectedNotesIncludeUnarchived) {
+                Button(onClick = viewModel::batchArchiveSelected) {
+                    Text("Archive")
                 }
             }
             Button(onClick = viewModel::batchDuplicateSelected) {
@@ -2726,6 +2779,12 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp)) }
         )
         FilterChip(
+            selected = state.surface == NotesSurface.Archived,
+            onClick = { viewModel.setSurface(NotesSurface.Archived) },
+            label = { Text("Archive ${state.archivedCount}") },
+            leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null, modifier = Modifier.size(16.dp)) }
+        )
+        FilterChip(
             selected = state.surface == NotesSurface.Trash,
             onClick = { viewModel.setSurface(NotesSurface.Trash) },
             label = { Text("Trash ${state.trashCount}") },
@@ -2808,6 +2867,8 @@ fun NoteCard(
     onTogglePinned: () -> Unit,
     onPinToHome: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onArchive: () -> Unit,
+    onUnarchive: () -> Unit,
     onSetReminderTomorrow: () -> Unit,
     onClearReminder: () -> Unit,
     onToggleLock: () -> Unit,
@@ -2841,6 +2902,7 @@ fun NoteCard(
                 )
                 if (note.pinned) Icon(Icons.Default.PushPin, contentDescription = "Pinned", tint = MaterialTheme.colorScheme.primary)
                 if (note.favorite) Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color(0xFFE3A008))
+                if (note.archived) Icon(Icons.Default.Archive, contentDescription = "Archived", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (note.reminderAt != null) Icon(Icons.Default.NotificationsActive, contentDescription = "Reminder", tint = MaterialTheme.colorScheme.primary)
                 if (note.locked) Icon(Icons.Default.Lock, contentDescription = "Locked", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box {
@@ -2912,6 +2974,14 @@ fun NoteCard(
                                 onClick = {
                                     menuOpen = false
                                     onToggleFavorite()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (note.archived) "Restore from Archive" else "Archive note") },
+                                leadingIcon = { Icon(Icons.Default.Archive, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    if (note.archived) onUnarchive() else onArchive()
                                 }
                             )
                             DropdownMenuItem(
@@ -4968,6 +5038,7 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("pinned", pinned)
     .put("favorite", favorite)
     .put("locked", locked)
+    .put("archived", archived)
     .put("deleted", deleted)
     .put("deletedAt", deletedAt ?: JSONObject.NULL)
     .put("reminderAt", reminderAt ?: JSONObject.NULL)
@@ -5132,6 +5203,7 @@ fun JSONObject.toNote(): SNote = SNote(
     pinned = optBoolean("pinned", false),
     favorite = optBoolean("favorite", false),
     locked = optBoolean("locked", false),
+    archived = optBoolean("archived", false),
     deleted = optBoolean("deleted", false),
     deletedAt = optNullableLong("deletedAt"),
     reminderAt = optNullableLong("reminderAt"),

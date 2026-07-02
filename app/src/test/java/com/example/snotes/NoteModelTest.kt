@@ -15,6 +15,7 @@ class NoteModelTest {
             tags = listOf("meeting", "audio"),
             pinned = true,
             favorite = true,
+            archived = true,
             reminderAt = 1_700_000_000_000,
             pageTemplate = PageTemplate.Cornell,
             paperColor = 0xFFEFF6FF,
@@ -69,6 +70,7 @@ class NoteModelTest {
         assertEquals(note.tags, restored.tags)
         assertTrue(restored.pinned)
         assertTrue(restored.favorite)
+        assertTrue(restored.archived)
         assertEquals(1_700_000_000_000, restored.reminderAt)
         assertEquals(PageTemplate.Cornell, restored.pageTemplate)
         assertEquals(0xFFEFF6FF, restored.paperColor)
@@ -100,7 +102,8 @@ class NoteModelTest {
             notes = listOf(
                 SNote(title = "Meeting", folder = "Work", tags = listOf("team"), blocks = listOf(NoteBlock.Text(text = "Roadmap"))),
                 SNote(title = "Groceries", folder = "Personal", tags = listOf("errand"), locked = true, blocks = listOf(NoteBlock.Checklist())),
-                SNote(title = "Old", folder = "Work", tags = listOf("team"), deleted = true)
+                SNote(title = "Old", folder = "Work", tags = listOf("team"), deleted = true),
+                SNote(title = "Archived", folder = "Work", tags = listOf("team"), archived = true)
             ),
             search = "road",
             folderFilter = "Work",
@@ -116,6 +119,10 @@ class NoteModelTest {
         val lockedState = state.copy(search = "", folderFilter = null, tagFilter = null, surface = NotesSurface.Locked)
         assertEquals(listOf("Groceries"), lockedState.visibleNotes.map { it.title })
         assertEquals(1, lockedState.lockedCount)
+
+        val archivedState = state.copy(search = "", folderFilter = null, tagFilter = null, surface = NotesSurface.Archived)
+        assertEquals(listOf("Archived"), archivedState.visibleNotes.map { it.title })
+        assertEquals(1, archivedState.archivedCount)
     }
 
     @Test
@@ -125,6 +132,7 @@ class NoteModelTest {
         assertEquals("No favorites yet", NotesUiState(surface = NotesSurface.Favorites).emptyNotesCopy().title)
         assertEquals("No reminders", NotesUiState(surface = NotesSurface.Reminders).emptyNotesCopy().title)
         assertEquals("No locked notes", NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().title)
+        assertEquals("Archive is empty", NotesUiState(surface = NotesSurface.Archived).emptyNotesCopy().title)
         assertNull(NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().actionLabel)
         assertEquals(
             "New note",
@@ -370,7 +378,7 @@ class NoteModelTest {
 
     @Test
     fun selectionStateTracksAvailablePinFavoriteAndLockActions() {
-        val pinnedFavorite = SNote(id = "pinned", pinned = true, favorite = true, locked = true)
+        val pinnedFavorite = SNote(id = "pinned", pinned = true, favorite = true, locked = true, archived = true)
         val normal = SNote(id = "normal")
         val state = NotesUiState(
             notes = listOf(pinnedFavorite, normal),
@@ -383,11 +391,14 @@ class NoteModelTest {
         assertTrue(state.selectedNotesIncludeNonFavorite)
         assertTrue(state.selectedNotesIncludeLocked)
         assertTrue(state.selectedNotesIncludeUnlocked)
+        assertTrue(state.selectedNotesIncludeArchived)
+        assertTrue(state.selectedNotesIncludeUnarchived)
 
         val pinnedOnly = state.copy(selectedNoteIds = setOf("pinned"))
         assertFalse(pinnedOnly.selectedNotesIncludeUnpinned)
         assertFalse(pinnedOnly.selectedNotesIncludeNonFavorite)
         assertFalse(pinnedOnly.selectedNotesIncludeUnlocked)
+        assertFalse(pinnedOnly.selectedNotesIncludeUnarchived)
     }
 
     @Test
@@ -497,6 +508,7 @@ class NoteModelTest {
             tags = listOf("copy"),
             pinned = true,
             favorite = true,
+            archived = true,
             deleted = true,
             deletedAt = 12,
             createdAt = 1,
@@ -527,6 +539,7 @@ class NoteModelTest {
         assertEquals(listOf("copy"), duplicate.tags)
         assertFalse(duplicate.pinned)
         assertFalse(duplicate.favorite)
+        assertFalse(duplicate.archived)
         assertFalse(duplicate.deleted)
         assertNull(duplicate.deletedAt)
         assertEquals(42, duplicate.createdAt)
@@ -1075,6 +1088,7 @@ class NoteModelTest {
             pinned = true,
             favorite = true,
             locked = true,
+            archived = true,
             reminderAt = 1_710_000_000_000,
             pageTemplate = PageTemplate.Planner,
             paperColor = 0xFFFFF8D6,
@@ -1106,6 +1120,7 @@ class NoteModelTest {
         assertTrue(restored.pinned)
         assertTrue(restored.favorite)
         assertTrue(restored.locked)
+        assertTrue(restored.archived)
         assertFalse(restored.deleted)
         assertNull(restored.deletedAt)
         assertEquals(1_710_000_000_000, restored.reminderAt)
@@ -1183,11 +1198,12 @@ class NoteModelTest {
     @Test
     fun trashMetadataLabelsAndRoundTrips() {
         val trashed = SNote(id = "trash", title = "Trash", deleted = true, deletedAt = 1_000)
-        val moved = SNote(id = "fresh").moveToTrash(deletedAt = 3_600_000)
+        val moved = SNote(id = "fresh", archived = true).moveToTrash(deletedAt = 3_600_000)
         val restored = moved.restoreFromTrash()
         val roundTrip = trashed.toJson().toNote()
 
         assertTrue(moved.deleted)
+        assertFalse(moved.archived)
         assertEquals(3_600_000L, moved.deletedAt)
         assertFalse(restored.deleted)
         assertNull(restored.deletedAt)

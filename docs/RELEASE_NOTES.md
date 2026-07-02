@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.4.8
+
+- Added an Archive surface so users can keep notes out of the main library without deleting them.
+- Added card-level and batch archive/unarchive actions, with archived notes unpinned automatically and excluded from folders, tags, favorites, reminders, locked-note counts, and normal search surfaces.
+- Persisted archived state through JSON backup/import, Room entities, and a Room v6 migration/index.
+- Added regression coverage for archived-note visibility, duplication, JSON round trips, Room mapping, selection actions, and Trash moves clearing archived state.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.7
 
 - Added page template and paper color metadata to plain-text, rich HTML, and PDF-line exports so exported notes retain page-style context.
