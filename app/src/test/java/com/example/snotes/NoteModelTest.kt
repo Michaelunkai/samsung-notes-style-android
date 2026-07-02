@@ -1584,6 +1584,32 @@ class NoteModelTest {
     }
 
     @Test
+    fun backupJsonSupportsSelectedAndSingleNoteRoundTrips() {
+        val notes = listOf(
+            SNote(id = "one", title = "One", folder = "Work", tags = listOf("portable")),
+            SNote(id = "two", title = "Two", favorite = true, blocks = listOf(NoteBlock.Checklist(items = listOf(CheckItem(text = "Ship"))))),
+            SNote(id = "three", title = "Three", archived = true)
+        )
+
+        val selectedBackup = notesToBackupJson(notes.take(2))
+        val selectedMetadata = backupMetadataFromJson(selectedBackup)
+        val selectedRoundTrip = notesFromBackupJson(selectedBackup)
+
+        assertEquals(2, selectedMetadata?.noteCount)
+        assertEquals(listOf("one", "two"), selectedRoundTrip.map { it.id })
+        assertTrue(selectedRoundTrip.first { it.id == "two" }.favorite)
+        assertEquals("Ship", (selectedRoundTrip.first { it.id == "two" }.blocks.single() as NoteBlock.Checklist).items.single().text)
+
+        val singleBackup = notesToBackupJson(listOf(notes.last()))
+        val singleMetadata = backupMetadataFromJson(singleBackup)
+        val singleRoundTrip = notesFromBackupJson(singleBackup)
+
+        assertEquals(1, singleMetadata?.noteCount)
+        assertEquals(listOf("three"), singleRoundTrip.map { it.id })
+        assertTrue(singleRoundTrip.single().archived)
+    }
+
+    @Test
     fun backupImportSkipsExpiredTrashNotes() {
         val deletedAt = 5_000L
         val notes = listOf(

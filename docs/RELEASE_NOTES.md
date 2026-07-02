@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.5.19
+
+- Added regression coverage proving selected-note and single-note Backup JSON payloads preserve backup metadata and round-trip note content.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.18
 
 - Added single-note Backup JSON export from the editor Share and export menu.
