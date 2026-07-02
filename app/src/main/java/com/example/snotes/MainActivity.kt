@@ -1376,6 +1376,24 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
+    fun importAttachmentIntoNote(noteId: String, sourceUri: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                importAttachmentToLocalBlock(getApplication(), Uri.parse(sourceUri))
+            }.onSuccess { block ->
+                val note = _state.value.notes.firstOrNull { it.id == noteId }
+                if (note == null) {
+                    setStatus("Note not found")
+                } else {
+                    updateNote(note.copy(blocks = note.blocks + block))
+                    setStatus(if (block is NoteBlock.Audio) "Audio imported" else "Attachment imported")
+                }
+            }.onFailure {
+                setStatus("Attachment import failed")
+            }
+        }
+    }
+
     fun setStatus(message: String?) {
         _state.update { it.copy(statusMessage = message) }
     }
@@ -2987,11 +3005,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
         runCatching {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        val metadata = queryAttachmentMetadata(context, uri)
-        viewModel.addBlock(
-            note,
-            metadata.toNoteBlock(uri.toString())
-        )
+        viewModel.importAttachmentIntoNote(note.id, uri.toString())
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
         val target = pendingCameraCapture

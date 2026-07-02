@@ -17,7 +17,7 @@ Current local build version: `0.4.0`.
 - Checklist blocks with add, edit, complete all, uncheck all, clear done, item reorder, and delete item actions.
 - Handwriting/drawing blocks with pen, fountain pen, highlighter, eraser, stroke width, color palette, undo, clear, vector JSON persistence, and segment-preserving erasing.
 - Mixed note block reorder and duplicate controls for text, sticky, checklist, handwriting, attachment, and audio blocks.
-- Attachment blocks using Android's document picker, durable app-private copies for shared imports, FileProvider-backed camera capture/import exposure, image previews, PDF-aware page-count metadata when Android can read the file, file metadata, open-with-Android viewer actions, and reference-aware cleanup of unlinked app-private imports/captures.
+- Attachment blocks using Android's document picker, durable app-private copies for editor-picked and shared imports, FileProvider-backed camera capture/import exposure, image previews, PDF-aware page-count metadata when Android can read the file, file metadata, open-with-Android viewer actions, and reference-aware cleanup of unlinked app-private imports/captures.
 - Audio recording blocks using `MediaRecorder`, runtime microphone permission, playback, searchable timestamp markers, and shared audio import as playable audio blocks.
 - Local offline-first Room persistence with a first-run migration path from the legacy JSON note store.
 - Row-level Room upserts for normal note edits to avoid rewriting the whole note table during editor changes.

@@ -12,6 +12,7 @@
 - Grouped editor share/export actions into a compact overflow menu to reduce toolbar crowding.
 - Broadened Android share/import targets to text, image, audio, video, and application document MIME types.
 - Shared attachments are copied into app-private storage so imported files survive after temporary share grants expire.
+- Editor-picked attachments now use the same app-private import path instead of depending on long-lived external document grants.
 - Removed app-private imported/captured files after their last note reference is permanently deleted or their block is removed.
 - Added PDF-aware attachment metadata, including page counts in attachment cards, search labels, backup data, and TXT/HTML exports when Android can inspect the PDF.
 - Improved large-library persistence by deleting permanently removed notes with targeted Room row deletes instead of replacing the whole note table.
