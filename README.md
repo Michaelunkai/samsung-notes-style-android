@@ -2,7 +2,7 @@
 
 Native Android prototype for a Samsung Notes-style note-taking app.
 
-Current local build version: `0.5.24`.
+Current local build version: `0.5.25`.
 
 ## Implemented in this workspace
 
@@ -47,3 +47,8 @@ The script runs clean build, debug APK assembly, JVM unit tests, lint, and suppo
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
+
+Additional release-readiness documents:
+
+- `docs\FINAL_LOCAL_AUDIT.md` maps the implemented local feature surface against the remaining device/account/server-gated items.
+- `docs\DEVICE_TEST_PLAN.md` defines the controlled Android-device validation checklist for the next explicit approval gate.

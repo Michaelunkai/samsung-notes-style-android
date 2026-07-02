@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.25
+
+- Added a final local audit document that maps implemented Samsung Notes-style feature coverage to the remaining device/account/server-gated work.
+- Added an Android-device test plan with preconditions, deployment commands, smoke-test coverage, proof artifacts, and rollback rules for the next explicit approval gate.
+- Updated release documentation to make the current local proof boundary and device-testing boundary unambiguous.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.24
 
 - Added selected-note PDF bundle export to the multi-select Export menu.
