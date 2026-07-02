@@ -496,6 +496,7 @@ class NoteModelTest {
             pinned = true,
             favorite = true,
             deleted = true,
+            deletedAt = 12,
             createdAt = 1,
             updatedAt = 2,
             blocks = listOf(
@@ -525,6 +526,7 @@ class NoteModelTest {
         assertFalse(duplicate.pinned)
         assertFalse(duplicate.favorite)
         assertFalse(duplicate.deleted)
+        assertNull(duplicate.deletedAt)
         assertEquals(42, duplicate.createdAt)
         assertEquals(42, duplicate.updatedAt)
         assertTrue(duplicate.id != original.id)
@@ -1092,6 +1094,8 @@ class NoteModelTest {
         assertTrue(restored.pinned)
         assertTrue(restored.favorite)
         assertTrue(restored.locked)
+        assertFalse(restored.deleted)
+        assertNull(restored.deletedAt)
         assertEquals(1_710_000_000_000, restored.reminderAt)
         assertEquals(PageTemplate.Ruled, restored.pageTemplate)
         assertEquals(0xFFFFF8D6, restored.paperColor)
@@ -1155,12 +1159,31 @@ class NoteModelTest {
     @Test
     fun trashHelpersRestoreOrDeleteDeletedNotesOnly() {
         val active = SNote(id = "active", title = "Active")
-        val deleted = SNote(id = "deleted", title = "Deleted", deleted = true)
+        val deleted = SNote(id = "deleted", title = "Deleted", deleted = true, deletedAt = 1_000)
         val notes = listOf(active, deleted)
 
         assertEquals(listOf("active"), notes.deleteTrash().map { it.id })
         assertTrue(notes.restoreTrash().none { it.deleted })
+        assertNull(notes.restoreTrash().first { it.id == "deleted" }.deletedAt)
         assertEquals(listOf("active", "deleted"), notes.restoreTrash().map { it.id })
+    }
+
+    @Test
+    fun trashMetadataLabelsAndRoundTrips() {
+        val trashed = SNote(id = "trash", title = "Trash", deleted = true, deletedAt = 1_000)
+        val moved = SNote(id = "fresh").moveToTrash(deletedAt = 3_600_000)
+        val restored = moved.restoreFromTrash()
+        val roundTrip = trashed.toJson().toNote()
+
+        assertTrue(moved.deleted)
+        assertEquals(3_600_000L, moved.deletedAt)
+        assertFalse(restored.deleted)
+        assertNull(restored.deletedAt)
+        assertEquals("Moved to Trash 1h ago", trashed.trashLabel(now = 3_601_000))
+        assertEquals("In Trash", trashed.copy(deletedAt = null).trashLabel(now = 3_601_000))
+        assertNull(SNote(title = "Active").trashLabel())
+        assertEquals(1_000L, roundTrip.deletedAt)
+        assertEquals(1_000L, trashed.toEntity().toNote().deletedAt)
     }
 
     @Test

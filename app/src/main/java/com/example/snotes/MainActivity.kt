@@ -265,6 +265,7 @@ data class SNote(
     val favorite: Boolean = false,
     val locked: Boolean = false,
     val deleted: Boolean = false,
+    val deletedAt: Long? = null,
     val reminderAt: Long? = null,
     val pageTemplate: PageTemplate = PageTemplate.Plain,
     val paperColor: Long = 0xFFFFFBF0,
@@ -289,6 +290,7 @@ fun SNote.editableContentEquals(other: SNote): Boolean =
         favorite == other.favorite &&
         locked == other.locked &&
         deleted == other.deleted &&
+        deletedAt == other.deletedAt &&
         reminderAt == other.reminderAt &&
         pageTemplate == other.pageTemplate &&
         paperColor == other.paperColor
@@ -1164,12 +1166,12 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteNote(note: SNote) {
-        updateNote(note.copy(deleted = true))
+        updateNote(note.moveToTrash())
         _state.update { it.copy(selectedNoteId = null) }
     }
 
     fun restoreNote(note: SNote) {
-        updateNote(note.copy(deleted = false))
+        updateNote(note.restoreFromTrash())
     }
 
     fun permanentlyDeleteNote(note: SNote) {
@@ -1292,11 +1294,12 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun batchMoveSelectedToTrash() {
-        updateSelectedNotes("Moved selected notes to Trash") { it.copy(deleted = true) }
+        val deletedAt = System.currentTimeMillis()
+        updateSelectedNotes("Moved selected notes to Trash") { it.moveToTrash(deletedAt) }
     }
 
     fun batchRestoreSelected() {
-        updateSelectedNotes("Restored selected notes") { it.copy(deleted = false) }
+        updateSelectedNotes("Restored selected notes") { it.restoreFromTrash() }
     }
 
     fun batchDeleteSelectedPermanently() {
@@ -1567,10 +1570,17 @@ fun SNote.duplicate(now: Long = System.currentTimeMillis()): SNote = copy(
     pinned = false,
     favorite = false,
     deleted = false,
+    deletedAt = null,
     reminderAt = null,
     createdAt = now,
     updatedAt = now
 )
+
+fun SNote.moveToTrash(deletedAt: Long = System.currentTimeMillis()): SNote =
+    copy(deleted = true, deletedAt = deletedAt)
+
+fun SNote.restoreFromTrash(): SNote =
+    copy(deleted = false, deletedAt = null)
 
 fun duplicateTitle(title: String): String =
     if (title.startsWith("Copy of ")) "$title copy" else "Copy of $title"
@@ -1717,10 +1727,33 @@ fun SNote.mediaCardLabel(): String? {
 fun SNote.reminderLabel(now: Long = System.currentTimeMillis()): String? =
     reminderAt?.let { reminderTimestampLabel(it, now) }
 
+fun SNote.trashLabel(now: Long = System.currentTimeMillis()): String? =
+    if (!deleted) {
+        null
+    } else {
+        deletedAt?.let { "Moved to Trash ${relativeAgeLabel(it, now)}" } ?: "In Trash"
+    }
+
 fun reminderTimestampLabel(timestamp: Long, now: Long = System.currentTimeMillis()): String {
     val prefix = if (timestamp < now) "Overdue" else "Reminder"
     return "$prefix ${formatTimestamp(timestamp)}"
 }
+
+fun relativeAgeLabel(timestamp: Long, now: Long = System.currentTimeMillis()): String {
+    val ageMs = (now - timestamp).coerceAtLeast(0L)
+    val minuteMs = 60_000L
+    val hourMs = 60L * minuteMs
+    val dayMs = 24L * hourMs
+    return when {
+        ageMs < minuteMs -> "just now"
+        ageMs < hourMs -> "${ageMs / minuteMs}m ago"
+        ageMs < dayMs -> "${ageMs / hourMs}h ago"
+        else -> "${ageMs / dayMs}d ago"
+    }
+}
+
+fun deletedTimestampOrNow(note: SNote, now: Long = System.currentTimeMillis()): Long =
+    note.deletedAt ?: now
 
 fun reminderPresetTimestamp(daysFromNow: Int, now: Long = System.currentTimeMillis()): Long =
     Calendar.getInstance().apply {
@@ -2883,6 +2916,18 @@ fun NoteCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall
             )
+            if (inTrash) {
+                note.trashLabel()?.let { trashLabel ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        trashLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
             if (!note.locked) {
                 note.reminderLabel()?.let { reminder ->
                     Spacer(Modifier.height(4.dp))
@@ -4753,7 +4798,7 @@ fun List<SNote>.deleteTrash(): List<SNote> =
     filterNot { it.deleted }
 
 fun List<SNote>.restoreTrash(): List<SNote> =
-    map { note -> if (note.deleted) note.copy(deleted = false) else note }
+    map { note -> if (note.deleted) note.restoreFromTrash() else note }
 
 fun List<SNote>.duplicatedNotesByIds(ids: Set<String>, now: Long = System.currentTimeMillis()): List<SNote> =
     filter { it.id in ids }.mapIndexed { index, note -> note.duplicate(now = now + index) }
@@ -4837,6 +4882,7 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("favorite", favorite)
     .put("locked", locked)
     .put("deleted", deleted)
+    .put("deletedAt", deletedAt ?: JSONObject.NULL)
     .put("reminderAt", reminderAt ?: JSONObject.NULL)
     .put("pageTemplate", pageTemplate.name)
     .put("paperColor", paperColor)
@@ -4991,6 +5037,7 @@ fun JSONObject.toNote(): SNote = SNote(
     favorite = optBoolean("favorite", false),
     locked = optBoolean("locked", false),
     deleted = optBoolean("deleted", false),
+    deletedAt = optNullableLong("deletedAt"),
     reminderAt = optNullableLong("reminderAt"),
     pageTemplate = optString("pageTemplate").toPageTemplate(PageTemplate.Plain),
     paperColor = optLong("paperColor", 0xFFFFFBF0),
