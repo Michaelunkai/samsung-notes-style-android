@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.4.9
+
+- Kept archived notes out of the home-screen widget's latest-note preview and library status counts so Archive behaves like a hidden main-library surface.
+- Added widget regression coverage proving newer archived notes do not replace the latest visible note or leak into widget copy.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.4.8
 
 - Added an Archive surface so users can keep notes out of the main library without deleting them.

@@ -21,7 +21,7 @@ fun widgetQuickNoteKinds(): List<NewNoteKind> =
     )
 
 fun notesWidgetSummary(notes: List<SNote>, now: Long = System.currentTimeMillis()): NotesWidgetSummary {
-    val visible = notes.filterNot { it.deleted }.sortedWith(NoteSortMode.ModifiedNewest.comparator)
+    val visible = notes.filter { !it.deleted && !it.archived }.sortedWith(NoteSortMode.ModifiedNewest.comparator)
     val latest = visible.firstOrNull()
     val status = notesWidgetStatus(visible, now)
     return NotesWidgetSummary(

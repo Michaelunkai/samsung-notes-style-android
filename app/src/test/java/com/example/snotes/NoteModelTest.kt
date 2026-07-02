@@ -1007,6 +1007,7 @@ class NoteModelTest {
             listOf(
                 SNote(id = "old", title = "Old", updatedAt = 1, blocks = listOf(NoteBlock.Text(text = "Old body"))),
                 SNote(id = "latest", title = "Latest", updatedAt = 3, blocks = listOf(NoteBlock.Text(text = "Latest body"))),
+                SNote(title = "Archived", archived = true, updatedAt = 6),
                 SNote(title = "Deleted", deleted = true, updatedAt = 5)
             )
         )
@@ -1022,6 +1023,8 @@ class NoteModelTest {
         assertEquals("Latest", normal.title)
         assertEquals("latest", normal.noteId)
         assertTrue(normal.subtitle.contains("Latest body"))
+        assertTrue(normal.subtitle.contains("2 notes"))
+        assertFalse(normal.subtitle.contains("Archived"))
         assertEquals("Pinned", pinned.title)
         assertEquals("Locked note • 1 note", locked.subtitle)
         assertFalse(locked.subtitle.contains("Secret"))
