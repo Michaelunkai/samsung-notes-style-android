@@ -12,10 +12,13 @@ The script uses `.tooling\jdk`, `.tooling\android-sdk`, and `.tooling\gradle` wh
 
 ## Current verified surface
 
+- Full local verification completed on 2026-07-02 for version `0.4.0`.
+- Command shape: `clean :app:compileDebugKotlin :app:compileDebugUnitTestKotlin :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`
 - Debug Kotlin compilation: `:app:compileDebugKotlin`
 - JVM unit tests: `:app:testDebugUnitTest`
 - Android manifest/resource processing: `:app:processDebugMainManifest`, `:app:processDebugResources`
 - Debug APK assembly: `:app:assembleDebug`
+- Android lint: `:app:lintDebug`
 - Debug APK path: `app\build\outputs\apk\debug\app-debug.apk`
 
 Current Android-device testing is intentionally deferred until the explicit approval gate.
