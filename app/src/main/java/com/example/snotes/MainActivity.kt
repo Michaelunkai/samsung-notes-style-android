@@ -2832,6 +2832,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var pendingCameraCapture by remember { mutableStateOf<CameraCaptureTarget?>(null) }
     var detailsOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var shareExportMenuOpen by remember { mutableStateOf(false) }
     var editorSearchOpen by remember { mutableStateOf(false) }
     var editorSearchQuery by remember(note.id) { mutableStateOf("") }
     var activeSearchMatch by remember(note.id) { mutableStateOf(0) }
@@ -2968,32 +2969,47 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                     IconButton(onClick = { viewModel.duplicateNote(note) }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate note")
                     }
-                    IconButton(onClick = { shareNoteText(context, note) }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share note")
-                    }
-                    IconButton(
-                        onClick = {
-                            pendingNoteExportText = note.toPlainText()
-                            noteExportLauncher.launch("${note.title.sanitizeFileName()}.txt")
+                    Box {
+                        IconButton(onClick = { shareExportMenuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Share and export")
                         }
-                    ) {
-                        Icon(Icons.Default.Description, contentDescription = "Export note")
-                    }
-                    IconButton(
-                        onClick = {
-                            pendingNoteExportText = note.toHtmlDocument()
-                            noteHtmlExportLauncher.launch("${note.title.sanitizeFileName()}.html")
+                        DropdownMenu(expanded = shareExportMenuOpen, onDismissRequest = { shareExportMenuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Share note") },
+                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                onClick = {
+                                    shareExportMenuOpen = false
+                                    shareNoteText(context, note)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export TXT") },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                onClick = {
+                                    shareExportMenuOpen = false
+                                    pendingNoteExportText = note.toPlainText()
+                                    noteExportLauncher.launch("${note.title.sanitizeFileName()}.txt")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export HTML") },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                onClick = {
+                                    shareExportMenuOpen = false
+                                    pendingNoteExportText = note.toHtmlDocument()
+                                    noteHtmlExportLauncher.launch("${note.title.sanitizeFileName()}.html")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export PDF") },
+                                leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
+                                onClick = {
+                                    shareExportMenuOpen = false
+                                    pendingPdfExportNote = note
+                                    notePdfExportLauncher.launch("${note.title.sanitizeFileName()}.pdf")
+                                }
+                            )
                         }
-                    ) {
-                        Icon(Icons.Default.Description, contentDescription = "Export HTML")
-                    }
-                    IconButton(
-                        onClick = {
-                            pendingPdfExportNote = note
-                            notePdfExportLauncher.launch("${note.title.sanitizeFileName()}.pdf")
-                        }
-                    ) {
-                        Icon(Icons.Default.PictureAsPdf, contentDescription = "Export PDF")
                     }
                     IconButton(onClick = { viewModel.toggleFavorite(note) }) {
                         Icon(
