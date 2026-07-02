@@ -826,6 +826,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     )
     val state: StateFlow<NotesUiState> = _state
 
+    init {
+        scheduleAllNoteReminders(getApplication(), _state.value.notes)
+    }
+
     fun createNote(kind: NewNoteKind) {
         val note = kind.createNoteForState(_state.value)
         _state.update { it.copy(notes = listOf(note) + it.notes, selectedNoteId = note.id) }
@@ -1068,6 +1072,9 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateReminder(note: SNote, reminderAt: Long?) {
         updateNote(note.copy(reminderAt = reminderAt))
+        _state.update {
+            it.copy(statusMessage = if (reminderAt == null) "Reminder cleared" else "Reminder scheduled")
+        }
     }
 
     fun toggleFavorite(note: SNote) {
@@ -1154,6 +1161,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun permanentlyDeleteNote(note: SNote) {
+        cancelNoteReminder(getApplication(), note.id)
         _state.update { state ->
             state.copy(
                 notes = state.notes.filterNot { it.id == note.id },
@@ -1279,6 +1287,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun batchDeleteSelectedPermanently() {
+        val deletedIds = _state.value.selectedNoteIds
+        deletedIds.forEach { cancelNoteReminder(getApplication(), it) }
         _state.update { state ->
             state.copy(
                 notes = state.notes.deleteByIds(state.selectedNoteIds),
@@ -1302,6 +1312,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun emptyTrash() {
+        val deletedIds = _state.value.notes.filter { it.deleted }.map { it.id }
+        deletedIds.forEach { cancelNoteReminder(getApplication(), it) }
         _state.update { state ->
             state.copy(
                 notes = state.notes.deleteTrash(),
@@ -1376,6 +1388,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         val notes = _state.value.notes
         viewModelScope.launch(Dispatchers.IO) {
             repository.save(notes)
+            scheduleAllNoteReminders(getApplication(), notes)
             refreshNotesWidgets(getApplication())
         }
     }
@@ -1383,6 +1396,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     private fun persistNote(note: SNote) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.saveNote(note)
+            scheduleNoteReminder(getApplication(), note)
             refreshNotesWidgets(getApplication())
         }
     }
@@ -1869,6 +1883,10 @@ fun Intent.sharedStreamUris(): List<Uri> = buildList {
     }
 }
 
+fun Context.needsPostNotificationPermission(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesApp(viewModel: NotesViewModel, launchRequest: SequencedLaunchRequest = SequencedLaunchRequest(0, NoteLaunchRequest())) {
@@ -1928,6 +1946,15 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
     var sortMenuOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var unlockTarget by remember { mutableStateOf<SNote?>(null) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.setStatus(if (granted) "Notifications enabled" else "Reminder saved; notifications are disabled")
+    }
+    val updateReminderWithPermission = { note: SNote, reminderAt: Long? ->
+        if (reminderAt != null && context.needsPostNotificationPermission()) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        viewModel.updateReminder(note, reminderAt)
+    }
     val requestPinSetup = {
         settingsOpen = true
         viewModel.setStatus("Set a Notes PIN to lock notes")
@@ -2216,8 +2243,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
-                            onSetReminderTomorrow = { viewModel.updateReminder(note, reminderPresetTimestamp(1)) },
-                            onClearReminder = { viewModel.updateReminder(note, null) },
+                            onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
+                            onClearReminder = { updateReminderWithPermission(note, null) },
                             onToggleLock = {
                                 if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
                             },
@@ -2258,8 +2285,8 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                             onDuplicate = { viewModel.duplicateNote(note) },
                             onTogglePinned = { viewModel.togglePinned(note) },
                             onToggleFavorite = { viewModel.toggleFavorite(note) },
-                            onSetReminderTomorrow = { viewModel.updateReminder(note, reminderPresetTimestamp(1)) },
-                            onClearReminder = { viewModel.updateReminder(note, null) },
+                            onSetReminderTomorrow = { updateReminderWithPermission(note, reminderPresetTimestamp(1)) },
+                            onClearReminder = { updateReminderWithPermission(note, null) },
                             onToggleLock = {
                                 if (!note.locked && !state.hasNotePin) requestPinSetup() else viewModel.toggleLocked(note)
                             },
@@ -2834,6 +2861,15 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var settingsOpen by remember { mutableStateOf(false) }
     var shareExportMenuOpen by remember { mutableStateOf(false) }
     var editorSearchOpen by remember { mutableStateOf(false) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.setStatus(if (granted) "Notifications enabled" else "Reminder saved; notifications are disabled")
+    }
+    val updateReminderWithPermission = { target: SNote, reminderAt: Long? ->
+        if (reminderAt != null && context.needsPostNotificationPermission()) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        viewModel.updateReminder(target, reminderAt)
+    }
     var editorSearchQuery by remember(note.id) { mutableStateOf("") }
     var activeSearchMatch by remember(note.id) { mutableStateOf(0) }
     val editorSearchMatches = remember(note, editorSearchQuery) { note.editorSearchMatches(editorSearchQuery) }
@@ -3081,7 +3117,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                NoteMetaEditor(note, state, viewModel)
+                NoteMetaEditor(note, state, viewModel, onUpdateReminder = updateReminderWithPermission)
             }
             if (editorSearchOpen) {
                 item {
@@ -3428,7 +3464,12 @@ fun NoteSearchPanel(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NoteMetaEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
+fun NoteMetaEditor(
+    note: SNote,
+    state: NotesUiState,
+    viewModel: NotesViewModel,
+    onUpdateReminder: (SNote, Long?) -> Unit
+) {
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
@@ -3465,21 +3506,21 @@ fun NoteMetaEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) 
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 AssistChip(
-                    onClick = { viewModel.updateReminder(note, reminderPresetTimestamp(1)) },
+                    onClick = { onUpdateReminder(note, reminderPresetTimestamp(1)) },
                     label = { Text("Tomorrow") },
                     leadingIcon = { Icon(Icons.Default.Notifications, null) }
                 )
                 AssistChip(
-                    onClick = { viewModel.updateReminder(note, reminderPresetTimestamp(7)) },
+                    onClick = { onUpdateReminder(note, reminderPresetTimestamp(7)) },
                     label = { Text("Next week") }
                 )
                 AssistChip(
-                    onClick = { viewModel.updateReminder(note, reminderPresetTimestamp(30)) },
+                    onClick = { onUpdateReminder(note, reminderPresetTimestamp(30)) },
                     label = { Text("Next month") }
                 )
                 if (note.reminderAt != null) {
                     AssistChip(
-                        onClick = { viewModel.updateReminder(note, null) },
+                        onClick = { onUpdateReminder(note, null) },
                         label = { Text("Clear") },
                         leadingIcon = { Icon(Icons.Default.Close, null) }
                     )

@@ -716,6 +716,17 @@ class NoteModelTest {
     }
 
     @Test
+    fun reminderNotificationCopyHidesLockedNoteContent() {
+        val unlocked = SNote(title = "Dentist appointment")
+        val locked = SNote(title = "Private plan", locked = true)
+
+        assertEquals("Dentist appointment", unlocked.reminderNotificationTitle())
+        assertEquals("Tap to open this note", unlocked.reminderNotificationText())
+        assertEquals("Locked note reminder", locked.reminderNotificationTitle())
+        assertEquals("Unlock the note to view its contents", locked.reminderNotificationText())
+    }
+
+    @Test
     fun noteDetailsSummarizeMixedContentCounts() {
         val note = SNote(
             blocks = listOf(

@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -44,6 +45,10 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/notes_widget_info" />
         </receiver>
+
+        <receiver
+            android:name=".NoteReminderReceiver"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
