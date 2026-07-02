@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.5.6
+
+- Added a Share action to the multi-select toolbar so selected notes can be exported through Android's plain-text share sheet.
+- Added a reusable multi-note plain-text bundle formatter with readable separators between notes.
+- Preserved locked-note privacy by skipping selected locked notes unless they are unlocked in the current session.
+- Added regression coverage for multi-note plain-text bundle output.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.5
 
 - Made notes created from the Archive surface start archived immediately so the global create action preserves the current library context.

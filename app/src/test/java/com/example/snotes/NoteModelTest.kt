@@ -768,6 +768,23 @@ class NoteModelTest {
     }
 
     @Test
+    fun multipleNotesPlainTextBundleSeparatesEachNote() {
+        val notes = listOf(
+            SNote(title = "First", folder = "Work", blocks = listOf(NoteBlock.Text(text = "Alpha"))),
+            SNote(title = "Second", tags = listOf("shared"), blocks = listOf(NoteBlock.Checklist(items = listOf(CheckItem(text = "Beta")))))
+        )
+
+        val bundle = notes.toPlainTextBundle()
+
+        assertTrue(bundle.startsWith("First"))
+        assertTrue(bundle.contains("Folder: Work"))
+        assertTrue(bundle.contains("Alpha"))
+        assertTrue(bundle.contains("\n\n---\n\nSecond"))
+        assertTrue(bundle.contains("Tags: #shared"))
+        assertTrue(bundle.contains("- [ ] Beta"))
+    }
+
+    @Test
     fun noteHtmlExportPreservesRichStructureAndEscapesContent() {
         val note = SNote(
             title = "Sprint <review>",

@@ -2047,6 +2047,23 @@ fun shareNoteText(context: Context, note: SNote) {
     context.startActivity(Intent.createChooser(intent, "Share note"))
 }
 
+fun List<SNote>.toPlainTextBundle(): String =
+    joinToString(separator = "\n\n---\n\n") { it.toPlainText() }
+
+fun shareNotesText(context: Context, notes: List<SNote>) {
+    if (notes.isEmpty()) return
+    val subject = if (notes.size == 1) {
+        notes.first().displayTitle(includePrivateContent = false)
+    } else {
+        "${notes.size} notes"
+    }
+    val intent = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_SUBJECT, subject)
+        .putExtra(Intent.EXTRA_TEXT, notes.toPlainTextBundle())
+    context.startActivity(Intent.createChooser(intent, "Share notes"))
+}
+
 fun writeNotePdf(context: Context, uri: Uri, note: SNote) {
     val document = PdfDocument()
     try {
@@ -2636,9 +2653,11 @@ fun EmptyNotesState(copy: EmptyNotesCopy, onCreateNote: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequestPinSetup: () -> Unit) {
+    val context = LocalContext.current
     var moveDialogOpen by remember { mutableStateOf(false) }
     var tagDialogOpen by remember { mutableStateOf(false) }
     var removeTagDialogOpen by remember { mutableStateOf(false) }
+    val shareableSelectedNotes = state.selectedNotes.filter { note -> !note.locked || note.id in state.unlockedNoteIds }
     if (moveDialogOpen) {
         BatchTextActionDialog(
             title = "Move to folder",
@@ -2680,6 +2699,20 @@ fun SelectionActionBar(state: NotesUiState, viewModel: NotesViewModel, onRequest
             OutlinedButton(onClick = viewModel::selectVisibleNotes) {
                 Text("Select all")
             }
+        }
+        Button(
+            onClick = {
+                if (shareableSelectedNotes.isEmpty()) {
+                    viewModel.setStatus("Unlock notes before sharing")
+                } else {
+                    shareNotesText(context, shareableSelectedNotes)
+                    viewModel.setStatus("Sharing ${shareableSelectedNotes.size} note${if (shareableSelectedNotes.size == 1) "" else "s"}")
+                }
+            }
+        ) {
+            Icon(Icons.Default.Share, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text("Share")
         }
         if (state.surface == NotesSurface.Trash) {
             Button(onClick = viewModel::batchRestoreSelected) {
