@@ -26,7 +26,8 @@ import org.json.JSONObject
         Index("updatedAt"),
         Index("deleted"),
         Index("pinned"),
-        Index("favorite")
+        Index("favorite"),
+        Index("reminderAt")
     ]
 )
 data class NoteEntity(
@@ -40,11 +41,12 @@ data class NoteEntity(
     val favorite: Boolean,
     val locked: Boolean,
     val deleted: Boolean,
+    val reminderAt: Long? = null,
     val pageTemplate: String = PageTemplate.Plain.name,
     val paperColor: Long = 0xFFFFFBF0,
     val createdAt: Long,
     val updatedAt: Long,
-    val schemaVersion: Int = 3
+    val schemaVersion: Int = 4
 )
 
 @Dao
@@ -68,7 +70,7 @@ interface NoteDao {
     }
 }
 
-@Database(entities = [NoteEntity::class], version = 3, exportSchema = true)
+@Database(entities = [NoteEntity::class], version = 4, exportSchema = true)
 abstract class NotesDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 }
@@ -124,7 +126,7 @@ object NotesDatabaseProvider {
                 NotesDatabase::class.java,
                 "snotes.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration(false)
                 .build()
                 .also { instance = it }
@@ -143,6 +145,13 @@ object NotesDatabaseProvider {
             db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_pinned ON notes(pinned)")
         }
     }
+
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE notes ADD COLUMN reminderAt INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_reminderAt ON notes(reminderAt)")
+        }
+    }
 }
 
 fun SNote.toEntity(): NoteEntity = NoteEntity(
@@ -156,6 +165,7 @@ fun SNote.toEntity(): NoteEntity = NoteEntity(
     favorite = favorite,
     locked = locked,
     deleted = deleted,
+    reminderAt = reminderAt,
     pageTemplate = pageTemplate.name,
     paperColor = paperColor,
     createdAt = createdAt,
@@ -172,6 +182,7 @@ fun NoteEntity.toNote(): SNote = SNote(
     favorite = favorite,
     locked = locked,
     deleted = deleted,
+    reminderAt = reminderAt,
     pageTemplate = pageTemplate.toPageTemplate(PageTemplate.Plain),
     paperColor = paperColor,
     createdAt = createdAt,

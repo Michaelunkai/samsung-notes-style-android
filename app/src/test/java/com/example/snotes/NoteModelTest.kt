@@ -15,6 +15,7 @@ class NoteModelTest {
             tags = listOf("meeting", "audio"),
             pinned = true,
             favorite = true,
+            reminderAt = 1_700_000_000_000,
             pageTemplate = PageTemplate.Grid,
             paperColor = 0xFFEFF6FF,
             blocks = listOf(
@@ -61,6 +62,7 @@ class NoteModelTest {
         assertEquals(note.tags, restored.tags)
         assertTrue(restored.pinned)
         assertTrue(restored.favorite)
+        assertEquals(1_700_000_000_000, restored.reminderAt)
         assertEquals(PageTemplate.Grid, restored.pageTemplate)
         assertEquals(0xFFEFF6FF, restored.paperColor)
         assertEquals(6, restored.blocks.size)
@@ -112,6 +114,7 @@ class NoteModelTest {
         assertEquals("No matching notes", NotesUiState(search = "missing").emptyNotesCopy().title)
         assertEquals("Trash is empty", NotesUiState(surface = NotesSurface.Trash).emptyNotesCopy().title)
         assertEquals("No favorites yet", NotesUiState(surface = NotesSurface.Favorites).emptyNotesCopy().title)
+        assertEquals("No reminders", NotesUiState(surface = NotesSurface.Reminders).emptyNotesCopy().title)
         assertEquals("No locked notes", NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().title)
         assertNull(NotesUiState(surface = NotesSurface.Locked).emptyNotesCopy().actionLabel)
         assertEquals(
@@ -258,11 +261,13 @@ class NoteModelTest {
             noteDefaults = NoteDefaults(pageTemplate = PageTemplate.Grid)
         )
         val tagState = NotesUiState(surface = NotesSurface.Tags, tagFilter = "launch")
+        val reminderState = NotesUiState(surface = NotesSurface.Reminders)
         val lockedState = NotesUiState(surface = NotesSurface.Locked, notePinDigest = hashNotesPin("1234"))
         val unlockedState = NotesUiState(surface = NotesSurface.Locked)
 
         val folderNote = NewNoteKind.Text.createNoteForState(folderState)
         val tagNote = NewNoteKind.Checklist.createNoteForState(tagState)
+        val reminderNote = NewNoteKind.Text.createNoteForState(reminderState)
         val meetingNote = NewNoteKind.Meeting.createNoteForState(folderState)
         val lockedNote = NewNoteKind.Sticky.createNoteForState(lockedState)
         val unlockedNote = NewNoteKind.Text.createNoteForState(unlockedState)
@@ -271,6 +276,7 @@ class NoteModelTest {
         assertEquals(PageTemplate.Grid, folderNote.pageTemplate)
         assertEquals(listOf("launch"), tagNote.tags)
         assertTrue(tagNote.blocks.single() is NoteBlock.Checklist)
+        assertTrue(reminderNote.reminderAt != null)
         assertEquals("Work/Product", meetingNote.folder)
         assertTrue(meetingNote.blocks.any { it is NoteBlock.Checklist })
         assertTrue(lockedNote.locked)
@@ -294,6 +300,7 @@ class NoteModelTest {
     fun storedLibraryPreferencesFallbackToSupportedValues() {
         assertEquals(NoteSortMode.MediaHeavy, sortModeFromStoredValue("MediaHeavy"))
         assertEquals(NoteSortMode.ChecklistProgress, sortModeFromStoredValue("checklistprogress"))
+        assertEquals(NoteSortMode.ReminderSoonest, sortModeFromStoredValue("remindersoonest"))
         assertEquals(NoteSortMode.ModifiedNewest, sortModeFromStoredValue("LegacySort"))
         assertEquals(NoteViewMode.Grid, viewModeFromStoredValue("Grid"))
         assertEquals(NoteViewMode.List, viewModeFromStoredValue("LegacyView"))
@@ -889,6 +896,7 @@ class NoteModelTest {
             pinned = true,
             favorite = true,
             locked = true,
+            reminderAt = 1_710_000_000_000,
             pageTemplate = PageTemplate.Ruled,
             paperColor = 0xFFFFF8D6,
             blocks = listOf(
@@ -919,6 +927,7 @@ class NoteModelTest {
         assertTrue(restored.pinned)
         assertTrue(restored.favorite)
         assertTrue(restored.locked)
+        assertEquals(1_710_000_000_000, restored.reminderAt)
         assertEquals(PageTemplate.Ruled, restored.pageTemplate)
         assertEquals(0xFFFFF8D6, restored.paperColor)
         assertEquals("Momentum notes", restored.preview)
@@ -932,7 +941,7 @@ class NoteModelTest {
     fun surfacesExposeFavoritesTrashAndNestedFolders() {
         val notes = listOf(
             SNote(title = "Root", folder = "School", favorite = true, updatedAt = 3),
-            SNote(title = "Child", folder = "School/Physics", updatedAt = 2),
+            SNote(title = "Child", folder = "School/Physics", reminderAt = 1_700_000_000_000, updatedAt = 2),
             SNote(title = "Trash", folder = "School", deleted = true, updatedAt = 4),
             SNote(title = "Work", folder = "Work", updatedAt = 1)
         )
@@ -956,6 +965,10 @@ class NoteModelTest {
         val trashState = NotesUiState(notes = notes, surface = NotesSurface.Trash)
         assertEquals(listOf("Trash"), trashState.visibleNotes.map { it.title })
         assertEquals(1, trashState.trashCount)
+
+        val reminderState = NotesUiState(notes = notes, surface = NotesSurface.Reminders)
+        assertEquals(listOf("Child"), reminderState.visibleNotes.map { it.title })
+        assertEquals(1, reminderState.reminderCount)
     }
 
     @Test
@@ -1042,6 +1055,24 @@ class NoteModelTest {
 
         val mediaState = NotesUiState(notes = notes, sortMode = NoteSortMode.MediaHeavy)
         assertEquals(listOf("Pinned", "Favorite", "Media", "Tasks", "Alpha", "Beta"), mediaState.visibleNotes.map { it.title })
+    }
+
+    @Test
+    fun reminderSurfaceOrdersNotesBySoonestReminder() {
+        val notes = listOf(
+            SNote(title = "Later", reminderAt = 3_000, updatedAt = 3),
+            SNote(title = "No reminder", updatedAt = 4),
+            SNote(title = "Soon", reminderAt = 1_000, updatedAt = 1),
+            SNote(title = "Deleted", reminderAt = 500, deleted = true, updatedAt = 5)
+        )
+
+        val state = NotesUiState(
+            notes = notes,
+            surface = NotesSurface.Reminders,
+            sortMode = NoteSortMode.ReminderSoonest
+        )
+
+        assertEquals(listOf("Soon", "Later"), state.visibleNotes.map { it.title })
     }
 
     @Test

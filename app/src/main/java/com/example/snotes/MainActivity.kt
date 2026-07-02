@@ -93,6 +93,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -171,6 +173,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -197,7 +200,7 @@ const val SETTING_SORT_MODE = "sort_mode"
 const val SETTING_VIEW_MODE = "view_mode"
 const val NOTE_PIN_SALT = "s-notes-style-local-pin-v1"
 const val NOTE_HISTORY_LIMIT = 50
-const val BACKUP_SCHEMA_VERSION = 2
+const val BACKUP_SCHEMA_VERSION = 3
 const val BACKUP_APP_ID = "com.example.snotes"
 
 data class NoteLaunchRequest(
@@ -252,6 +255,7 @@ data class SNote(
     val favorite: Boolean = false,
     val locked: Boolean = false,
     val deleted: Boolean = false,
+    val reminderAt: Long? = null,
     val pageTemplate: PageTemplate = PageTemplate.Plain,
     val paperColor: Long = 0xFFFFFBF0,
     val createdAt: Long = System.currentTimeMillis(),
@@ -275,6 +279,7 @@ fun SNote.editableContentEquals(other: SNote): Boolean =
         favorite == other.favorite &&
         locked == other.locked &&
         deleted == other.deleted &&
+        reminderAt == other.reminderAt &&
         pageTemplate == other.pageTemplate &&
         paperColor == other.paperColor
 
@@ -582,6 +587,7 @@ data class NotesUiState(
                 when (surface) {
                     NotesSurface.All, NotesSurface.Folders, NotesSurface.Tags -> !note.deleted
                     NotesSurface.Favorites -> !note.deleted && note.favorite
+                    NotesSurface.Reminders -> !note.deleted && note.reminderAt != null
                     NotesSurface.Locked -> !note.deleted && note.locked
                     NotesSurface.Trash -> note.deleted
                 }
@@ -662,6 +668,9 @@ data class NotesUiState(
     val favoritesCount: Int
         get() = notes.count { !it.deleted && it.favorite }
 
+    val reminderCount: Int
+        get() = notes.count { !it.deleted && it.reminderAt != null }
+
     val hasNotePin: Boolean
         get() = !notePinDigest.isNullOrBlank()
 
@@ -682,6 +691,7 @@ enum class NotesSurface(val label: String) {
     Folders("Folders"),
     Tags("Tags"),
     Favorites("Favorites"),
+    Reminders("Reminders"),
     Locked("Locked notes"),
     Trash("Trash")
 }
@@ -724,6 +734,13 @@ enum class NoteSortMode(val label: String, val comparator: Comparator<SNote>) {
         "Folder",
         compareByDescending<SNote> { it.pinned }.thenByDescending { it.favorite }.thenBy { it.folder.lowercase() }.thenBy { it.title.lowercase() }
     ),
+    ReminderSoonest(
+        "Reminder soonest",
+        compareByDescending<SNote> { it.pinned }
+            .thenByDescending { it.favorite }
+            .thenBy { it.reminderAt ?: Long.MAX_VALUE }
+            .thenByDescending { it.updatedAt }
+    ),
     ChecklistProgress(
         "Checklist progress",
         compareByDescending<SNote> { it.pinned }
@@ -758,6 +775,11 @@ fun NotesUiState.emptyNotesCopy(): EmptyNotesCopy = when {
     surface == NotesSurface.Favorites -> EmptyNotesCopy(
         title = "No favorites yet",
         subtitle = "Favorite important notes to find them here quickly.",
+        actionLabel = noteDefaults.newNoteKind.title
+    )
+    surface == NotesSurface.Reminders -> EmptyNotesCopy(
+        title = "No reminders",
+        subtitle = "Add a reminder from a note's details panel to make it appear here.",
         actionLabel = noteDefaults.newNoteKind.title
     )
     surface == NotesSurface.Locked -> EmptyNotesCopy(
@@ -894,7 +916,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
         _state.update {
             when (surface) {
                 NotesSurface.All -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
-                NotesSurface.Favorites, NotesSurface.Locked, NotesSurface.Trash -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
+                NotesSurface.Favorites, NotesSurface.Reminders, NotesSurface.Locked, NotesSurface.Trash -> it.copy(surface = surface, folderFilter = null, tagFilter = null)
                 NotesSurface.Folders -> it.copy(surface = surface, tagFilter = null, folderFilter = it.folderFilter ?: it.rootFolders.firstOrNull() ?: it.folders.firstOrNull())
                 NotesSurface.Tags -> it.copy(surface = surface, folderFilter = null, tagFilter = it.tagFilter ?: it.tags.firstOrNull())
             }
@@ -1042,6 +1064,10 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updatePageStyle(note: SNote, template: PageTemplate = note.pageTemplate, paperColor: Long = note.paperColor) {
         updateNote(note.copy(pageTemplate = template, paperColor = paperColor))
+    }
+
+    fun updateReminder(note: SNote, reminderAt: Long?) {
+        updateNote(note.copy(reminderAt = reminderAt))
     }
 
     fun toggleFavorite(note: SNote) {
@@ -1454,6 +1480,7 @@ fun NewNoteKind.createNoteForState(state: NotesUiState): SNote {
     return when {
         state.surface == NotesSurface.Folders && state.folderFilter != null -> note.copy(folder = state.folderFilter)
         state.surface == NotesSurface.Tags && state.tagFilter != null -> note.copy(tags = listOf(state.tagFilter))
+        state.surface == NotesSurface.Reminders -> note.copy(reminderAt = reminderPresetTimestamp(1))
         state.surface == NotesSurface.Locked && state.hasNotePin -> note.copy(locked = true)
         else -> note
     }
@@ -1466,6 +1493,7 @@ fun SNote.duplicate(now: Long = System.currentTimeMillis()): SNote = copy(
     pinned = false,
     favorite = false,
     deleted = false,
+    reminderAt = null,
     createdAt = now,
     updatedAt = now
 )
@@ -1514,6 +1542,7 @@ fun SNote.toPlainText(): String = buildString {
     appendLine(title)
     appendLine("Folder: $folder")
     if (tags.isNotEmpty()) appendLine("Tags: ${tags.joinToString(", ") { "#$it" }}")
+    reminderLabel()?.let { appendLine(it) }
     appendLine()
     blocks.forEachIndexed { index, block ->
         if (index > 0) appendLine()
@@ -1570,6 +1599,24 @@ fun SNote.mediaCardLabel(): String? {
     }
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
+
+fun SNote.reminderLabel(now: Long = System.currentTimeMillis()): String? =
+    reminderAt?.let { reminderTimestampLabel(it, now) }
+
+fun reminderTimestampLabel(timestamp: Long, now: Long = System.currentTimeMillis()): String {
+    val prefix = if (timestamp < now) "Overdue" else "Reminder"
+    return "$prefix ${formatTimestamp(timestamp)}"
+}
+
+fun reminderPresetTimestamp(daysFromNow: Int, now: Long = System.currentTimeMillis()): Long =
+    Calendar.getInstance().apply {
+        timeInMillis = now
+        add(Calendar.DAY_OF_YEAR, daysFromNow)
+        set(Calendar.HOUR_OF_DAY, 9)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
 
 fun formatTimestamp(timestamp: Long): String =
     SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(timestamp))
@@ -1954,6 +2001,12 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                     onClick = { viewModel.setSurface(NotesSurface.Favorites) },
                     icon = { Icon(Icons.Default.Favorite, contentDescription = null) },
                     label = { Text("Favs") }
+                )
+                NavigationBarItem(
+                    selected = state.surface == NotesSurface.Reminders,
+                    onClick = { viewModel.setSurface(NotesSurface.Reminders) },
+                    icon = { Icon(Icons.Default.NotificationsActive, contentDescription = null) },
+                    label = { Text("Rem") }
                 )
                 NavigationBarItem(
                     selected = state.surface == NotesSurface.Locked,
@@ -2365,6 +2418,12 @@ fun FilterRail(state: NotesUiState, viewModel: NotesViewModel) {
             leadingIcon = { Icon(Icons.Default.Favorite, contentDescription = null, modifier = Modifier.size(16.dp)) }
         )
         FilterChip(
+            selected = state.surface == NotesSurface.Reminders,
+            onClick = { viewModel.setSurface(NotesSurface.Reminders) },
+            label = { Text("Reminders ${state.reminderCount}") },
+            leadingIcon = { Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp)) }
+        )
+        FilterChip(
             selected = state.surface == NotesSurface.Locked,
             onClick = { viewModel.setSurface(NotesSurface.Locked) },
             label = { Text("Locked ${state.lockedCount}") },
@@ -2483,6 +2542,7 @@ fun NoteCard(
                 )
                 if (note.pinned) Icon(Icons.Default.PushPin, contentDescription = "Pinned", tint = MaterialTheme.colorScheme.primary)
                 if (note.favorite) Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color(0xFFE3A008))
+                if (note.reminderAt != null) Icon(Icons.Default.NotificationsActive, contentDescription = "Reminder", tint = MaterialTheme.colorScheme.primary)
                 if (note.locked) Icon(Icons.Default.Lock, contentDescription = "Locked", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
@@ -2594,6 +2654,16 @@ fun NoteCard(
                 style = MaterialTheme.typography.labelSmall
             )
             if (!note.locked) {
+                note.reminderLabel()?.let { reminder ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        reminder,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
                 note.checklistProgressLabel()?.let { progress ->
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -3127,6 +3197,7 @@ fun NoteDetailsDialog(note: SNote, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 DetailRow("Folder", note.folder)
                 DetailRow("Tags", note.tags.joinToString(", ").ifBlank { "None" })
+                DetailRow("Reminder", note.reminderLabel() ?: "None")
                 DetailRow("Created", formatTimestamp(note.createdAt))
                 DetailRow("Modified", formatTimestamp(note.updatedAt))
                 DetailRow("Blocks", details.blockLabel)
@@ -3252,6 +3323,34 @@ fun NoteMetaEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) 
             }
             if (state.folders.isNotEmpty() || state.tags.isNotEmpty()) {
                 Text("Folders and tags update search and filter immediately.", style = MaterialTheme.typography.bodySmall)
+            }
+            Text("Reminder", style = MaterialTheme.typography.labelLarge)
+            Text(
+                note.reminderLabel() ?: "No reminder",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                AssistChip(
+                    onClick = { viewModel.updateReminder(note, reminderPresetTimestamp(1)) },
+                    label = { Text("Tomorrow") },
+                    leadingIcon = { Icon(Icons.Default.Notifications, null) }
+                )
+                AssistChip(
+                    onClick = { viewModel.updateReminder(note, reminderPresetTimestamp(7)) },
+                    label = { Text("Next week") }
+                )
+                AssistChip(
+                    onClick = { viewModel.updateReminder(note, reminderPresetTimestamp(30)) },
+                    label = { Text("Next month") }
+                )
+                if (note.reminderAt != null) {
+                    AssistChip(
+                        onClick = { viewModel.updateReminder(note, null) },
+                        label = { Text("Clear") },
+                        leadingIcon = { Icon(Icons.Default.Close, null) }
+                    )
+                }
             }
             Text("Page", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -4123,6 +4222,8 @@ fun SNote.searchMatches(query: String, scope: SearchScope = SearchScope.All): Li
                 .take(3)
                 .forEach { add(SearchMatch(SearchScope.Tags, "Tag: #$it")) }
         }
+        reminderLabel()?.takeIf { scope == SearchScope.All && it.contains(normalized, ignoreCase = true) }
+            ?.let { add(SearchMatch(SearchScope.All, it)) }
         if (!locked && scope.includes(SearchScope.Content)) {
             blocks.flatMap { it.contentSearchLabels(normalized) }
                 .take(4)
@@ -4152,6 +4253,8 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
         }
         tags.filter { it.contains(normalized, ignoreCase = true) }
             .forEach { tag -> add(EditorSearchMatch(null, "Tag", "#${tag.searchSnippet(normalized)}")) }
+        reminderLabel()?.takeIf { it.contains(normalized, ignoreCase = true) }
+            ?.let { add(EditorSearchMatch(null, "Reminder", it.searchSnippet(normalized))) }
         blocks.forEach { block ->
             when (block) {
                 is NoteBlock.Text -> if (block.text.contains(normalized, ignoreCase = true)) {
@@ -4337,6 +4440,7 @@ fun SNote.toJson(): JSONObject = JSONObject()
     .put("favorite", favorite)
     .put("locked", locked)
     .put("deleted", deleted)
+    .put("reminderAt", reminderAt ?: JSONObject.NULL)
     .put("pageTemplate", pageTemplate.name)
     .put("paperColor", paperColor)
     .put("createdAt", createdAt)
@@ -4488,6 +4592,7 @@ fun JSONObject.toNote(): SNote = SNote(
     favorite = optBoolean("favorite", false),
     locked = optBoolean("locked", false),
     deleted = optBoolean("deleted", false),
+    reminderAt = optNullableLong("reminderAt"),
     pageTemplate = optString("pageTemplate").toPageTemplate(PageTemplate.Plain),
     paperColor = optLong("paperColor", 0xFFFFFBF0),
     createdAt = optLong("createdAt", System.currentTimeMillis()),
@@ -4500,6 +4605,9 @@ fun JSONArray?.toStringList(): List<String> {
         for (i in 0 until length()) add(optString(i))
     }.filter { it.isNotBlank() }
 }
+
+fun JSONObject.optNullableLong(name: String): Long? =
+    if (has(name) && !isNull(name)) optLong(name) else null
 
 fun JSONArray?.toBlocks(): List<NoteBlock> {
     if (this == null) return emptyList()
