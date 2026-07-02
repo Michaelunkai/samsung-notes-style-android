@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.5.18
+
+- Added single-note Backup JSON export from the editor Share and export menu.
+- Made individual notes portable as re-importable backup payloads without needing to return to the list and multi-select the note first.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.17
 
 - Added a selected-note Backup JSON export option inside the multi-select Export menu.

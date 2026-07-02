@@ -3510,6 +3510,7 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
     var isRecording by remember { mutableStateOf(false) }
     var recordingStartedAt by remember { mutableStateOf(0L) }
     var pendingNoteExportText by remember { mutableStateOf("") }
+    var pendingNoteBackupExportText by remember { mutableStateOf("") }
     var pendingPdfExportNote by remember { mutableStateOf<SNote?>(null) }
     var pendingCameraCapture by remember { mutableStateOf<CameraCaptureTarget?>(null) }
     var detailsOpen by remember { mutableStateOf(false) }
@@ -3613,6 +3614,18 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
             viewModel.setStatus("PDF export failed")
         }
     }
+    val noteBackupExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                writer.write(pendingNoteBackupExportText)
+            } ?: error("Unable to open note backup destination")
+        }.onSuccess {
+            viewModel.setStatus("Note backup exported")
+        }.onFailure {
+            viewModel.setStatus("Note backup export failed")
+        }
+    }
 
     if (settingsOpen) {
         SettingsDialog(
@@ -3706,6 +3719,15 @@ fun NoteEditor(note: SNote, state: NotesUiState, viewModel: NotesViewModel) {
                                     shareExportMenuOpen = false
                                     pendingPdfExportNote = note
                                     notePdfExportLauncher.launch("${note.displayTitle().sanitizeFileName()}.pdf")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export backup JSON") },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                onClick = {
+                                    shareExportMenuOpen = false
+                                    pendingNoteBackupExportText = notesToBackupJson(listOf(note))
+                                    noteBackupExportLauncher.launch("${note.displayTitle().sanitizeFileName()}-backup.json")
                                 }
                             )
                         }
