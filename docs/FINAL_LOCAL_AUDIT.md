@@ -7,7 +7,7 @@ This audit summarizes the implemented local Android application surface before o
 ## Current Build
 
 - App package: `com.example.snotes`
-- Local release: `0.5.25`
+- Local release: `0.5.26`
 - Debug APK: `app\build\outputs\apk\debug\app-debug.apk`
 - Required local proof command: `.\scripts\verify.ps1`
 - Equivalent Gradle proof tasks: `:app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
@@ -35,7 +35,7 @@ This audit summarizes the implemented local Android application surface before o
 - Plain, ruled, grid, dotted, Cornell, and planner paper templates.
 - Paper color controls.
 - Page breaks and page-count-aware export behavior.
-- Meeting-note starter template.
+- Meeting, daily journal, and study-note starter templates.
 - Note-level undo/redo for recent mixed-block changes.
 
 ### Checklists And Sticky Notes
@@ -102,7 +102,7 @@ This audit summarizes the implemented local Android application surface before o
 - Home-screen widget provider with latest visible-note preview.
 - Locked-note privacy, Archive/Trash exclusion, reminder/checklist/media glance status, and latest-note open target.
 - Quick widget actions for text, checklist, sticky, handwriting, and meeting notes.
-- Static launcher shortcuts for quick text, checklist, sticky, handwriting, and meeting notes.
+- Static launcher shortcuts for quick text, checklist, sticky, handwriting, meeting, daily journal, and study notes.
 - Per-note pinned Home screen shortcut requests from note actions.
 
 ### Storage And Architecture
@@ -126,5 +126,4 @@ These are intentionally not claimed as complete in the local proof surface:
 
 ## Readiness Standard For The Device Gate
 
-The project is ready for the next controlled device gate only after the full local verification command passes for `0.5.25` and the debug APK exists. The device gate must follow `docs\DEVICE_TEST_PLAN.md` and must not start without explicit user approval.
-
+The project is ready for the next controlled device gate only after the full local verification command passes for `0.5.26` and the debug APK exists. The device gate must follow `docs\DEVICE_TEST_PLAN.md` and must not start without explicit user approval.

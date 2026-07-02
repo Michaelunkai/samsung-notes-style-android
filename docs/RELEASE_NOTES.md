@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.26
+
+- Added daily journal and study-note starter templates with mixed text, checklist, sticky, and page-break structure.
+- Exposed the new templates through the in-app Create menu and static launcher shortcuts.
+- Added regression coverage for template defaults, active folder inheritance, and quick-launch parsing.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.25
 
 - Added a final local audit document that maps implemented Samsung Notes-style feature coverage to the remaining device/account/server-gated work.

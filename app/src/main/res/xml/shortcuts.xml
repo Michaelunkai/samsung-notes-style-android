@@ -80,4 +80,36 @@
                 android:value="Meeting" />
         </intent>
     </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutDisabledMessage="@string/shortcut_disabled"
+        android:shortcutId="quick_journal_note"
+        android:shortcutLongLabel="@string/shortcut_journal_long"
+        android:shortcutShortLabel="@string/shortcut_journal_short">
+        <intent
+            android:action="com.example.snotes.action.QUICK_NOTE"
+            android:targetClass="com.example.snotes.MainActivity"
+            android:targetPackage="com.example.snotes">
+            <extra
+                android:name="com.example.snotes.extra.QUICK_NOTE_KIND"
+                android:value="DailyJournal" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutDisabledMessage="@string/shortcut_disabled"
+        android:shortcutId="quick_study_note"
+        android:shortcutLongLabel="@string/shortcut_study_long"
+        android:shortcutShortLabel="@string/shortcut_study_short">
+        <intent
+            android:action="com.example.snotes.action.QUICK_NOTE"
+            android:targetClass="com.example.snotes.MainActivity"
+            android:targetPackage="com.example.snotes">
+            <extra
+                android:name="com.example.snotes.extra.QUICK_NOTE_KIND"
+                android:value="Study" />
+        </intent>
+    </shortcut>
 </shortcuts>

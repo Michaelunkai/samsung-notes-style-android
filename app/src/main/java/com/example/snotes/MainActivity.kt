@@ -1656,7 +1656,9 @@ enum class NewNoteKind(val title: String) {
     Checklist("New checklist"),
     Sticky("New sticky note"),
     Drawing("New sketch"),
-    Meeting("Meeting note")
+    Meeting("Meeting note"),
+    DailyJournal("Daily journal"),
+    Study("Study note")
 }
 
 val NewNoteKind.settingsLabel: String
@@ -1666,6 +1668,8 @@ val NewNoteKind.settingsLabel: String
         NewNoteKind.Sticky -> "Sticky"
         NewNoteKind.Drawing -> "Sketch"
         NewNoteKind.Meeting -> "Meeting"
+        NewNoteKind.DailyJournal -> "Journal"
+        NewNoteKind.Study -> "Study"
     }
 
 fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()): SNote {
@@ -1684,6 +1688,30 @@ fun NewNoteKind.createNoteWithDefaults(defaults: NoteDefaults = NoteDefaults()):
                 )
             ),
             NoteBlock.Text(text = "Notes\n")
+        )
+        NewNoteKind.DailyJournal -> listOf(
+            NoteBlock.Text(text = "Date:\nMood:\nFocus:\n\nHighlights\n"),
+            NoteBlock.Checklist(
+                items = listOf(
+                    CheckItem(text = "Top priority"),
+                    CheckItem(text = "Gratitude"),
+                    CheckItem(text = "Follow up")
+                )
+            ),
+            NoteBlock.Sticky(text = "Reflection", color = 0xFFFFF8D6),
+            NoteBlock.Text(text = "Notes\n")
+        )
+        NewNoteKind.Study -> listOf(
+            NoteBlock.Text(text = "Topic:\nCourse:\nDate:\n\nKey ideas\n"),
+            NoteBlock.Checklist(
+                items = listOf(
+                    CheckItem(text = "Review lecture"),
+                    CheckItem(text = "Add questions"),
+                    CheckItem(text = "Summarize takeaways")
+                )
+            ),
+            NoteBlock.PageBreak(),
+            NoteBlock.Text(text = "Summary\n")
         )
     }
     return SNote(
@@ -2555,6 +2583,22 @@ fun NotesHome(state: NotesUiState, viewModel: NotesViewModel) {
                                 onClick = {
                                     createMenuOpen = false
                                     viewModel.createNote(NewNoteKind.Meeting)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Daily journal") },
+                                leadingIcon = { Icon(Icons.Default.Description, null) },
+                                onClick = {
+                                    createMenuOpen = false
+                                    viewModel.createNote(NewNoteKind.DailyJournal)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Study note") },
+                                leadingIcon = { Icon(Icons.Default.Description, null) },
+                                onClick = {
+                                    createMenuOpen = false
+                                    viewModel.createNote(NewNoteKind.Study)
                                 }
                             )
                         }

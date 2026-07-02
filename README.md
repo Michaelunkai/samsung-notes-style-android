@@ -2,14 +2,14 @@
 
 Native Android prototype for a Samsung Notes-style note-taking app.
 
-Current local build version: `0.5.25`.
+Current local build version: `0.5.26`.
 
 ## Implemented in this workspace
 
 - Kotlin Android project scaffold using Gradle Kotlin DSL and Jetpack Compose.
 - Notes home screen with persisted list/grid, smart content-derived display titles, display-title-aware sort/search, search-scope, and default note-type preferences, rich note-card metadata including checklist progress, reminder labels, Trash-age/retention labels with local expired-Trash pruning, and media summaries, expanded sorting including checklist-progress, reminder-soonest, media-first, trash-newest, and trash-review-ending modes, scoped search with clear action and active-scope summaries, contextual empty states, folders, tags, favorites, pinned notes, reminders, dedicated locked-notes and Archive views with contextual note creation, trash with restore-all/empty-trash actions, light/dark mode, and note-card/multi-select reminder presets, plus multi-select actions including select-all-visible, privacy-aware batch share, grouped TXT/HTML/PDF/backup export, duplicate, pin/unpin, favorite/unfavorite, archive/unarchive, and lock/unlock.
 - Folder and tag organization with note-count chips, nested folder rollups, filters, contextual note creation, bulk move/tag/untag actions, rename actions, folder deletion that moves notes back to All notes, and tag deletion that removes a tag from notes without deleting notes.
-- Editor screen with auto-persisted title, folder, tag, reminder, visible plain/ruled/grid/dotted/Cornell/planner paper templates, paper color, page breaks/page counts, meeting-note starter template, polished note details with word/character/content counts, mixed block changes, and capped note-level undo/redo.
+- Editor screen with auto-persisted title, folder, tag, reminder, visible plain/ruled/grid/dotted/Cornell/planner paper templates, paper color, page breaks/page counts, meeting, daily journal, and study-note starter templates, polished note details with word/character/content counts, mixed block changes, and capped note-level undo/redo.
 - Reminder scheduling with Android alarm-backed notifications, reboot rescheduling, Android 13+ notification permission handling, notification tap-through to the note, and locked-note notification privacy.
 - In-note search panel with match counts, snippets, previous/next navigation, active-match scrolling, and highlighted matched blocks.
 - Rich text block controls for bold, italic, underline, text color, highlight color, size presets, font family, and alignment.
@@ -25,7 +25,7 @@ Current local build version: `0.5.25`.
 - JSON backup export/import with schema/app/note-count metadata, expired-Trash import pruning, source-aware import status, deterministic imported-note merging, app-private rolling automatic backup snapshots with latest-snapshot restore, export, and Settings status, plus per-note plain text export/share, rich HTML export, PDF export with page-style metadata and page-break pagination, and single-note Backup JSON export.
 - Android share targets for incoming text, images, audio, video, and application documents, with imported audio promoted to playable audio blocks.
 - Home-screen widget provider with latest visible-note preview, locked-note privacy, Archive/Trash exclusion, library glance status for reminders/checklists/media, latest-note open target, and quick text/checklist/sticky/handwriting/meeting actions.
-- Static launcher shortcuts for quick text, checklist, sticky, handwriting, and meeting notes, plus per-note pinned Home screen shortcut requests from note actions.
+- Static launcher shortcuts for quick text, checklist, sticky, handwriting, meeting, daily journal, and study notes, plus per-note pinned Home screen shortcut requests from note actions.
 
 ## Important implementation notes
 

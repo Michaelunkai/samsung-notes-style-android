@@ -269,6 +269,8 @@ class NoteModelTest {
         val sticky = NewNoteKind.Sticky.createNoteWithDefaults(defaults)
         val drawing = NewNoteKind.Drawing.createNoteWithDefaults(defaults)
         val meeting = NewNoteKind.Meeting.createNoteWithDefaults(defaults)
+        val journal = NewNoteKind.DailyJournal.createNoteWithDefaults(defaults)
+        val study = NewNoteKind.Study.createNoteWithDefaults(defaults)
 
         assertEquals(PageTemplate.Dotted, text.pageTemplate)
         assertEquals(0xFFEFF6FF, text.paperColor)
@@ -279,10 +281,20 @@ class NoteModelTest {
         assertEquals("Meeting note", meeting.title)
         assertEquals(3, meeting.blocks.size)
         assertTrue(meeting.blocks[1] is NoteBlock.Checklist)
+        assertEquals("Daily journal", journal.title)
+        assertEquals(4, journal.blocks.size)
+        assertTrue(journal.blocks[1] is NoteBlock.Checklist)
+        assertTrue(journal.blocks[2] is NoteBlock.Sticky)
+        assertEquals("Study note", study.title)
+        assertEquals(4, study.blocks.size)
+        assertTrue(study.blocks[1] is NoteBlock.Checklist)
+        assertTrue(study.blocks[2] is NoteBlock.PageBreak)
         assertEquals(PageTemplate.Dotted, checklist.pageTemplate)
         assertEquals(PageTemplate.Dotted, sticky.pageTemplate)
         assertEquals(0xFFEFF6FF, drawing.paperColor)
         assertEquals(PageTemplate.Dotted, meeting.pageTemplate)
+        assertEquals(PageTemplate.Dotted, journal.pageTemplate)
+        assertEquals(PageTemplate.Dotted, study.pageTemplate)
     }
 
     @Test
@@ -302,6 +314,7 @@ class NoteModelTest {
         val tagNote = NewNoteKind.Checklist.createNoteForState(tagState)
         val reminderNote = NewNoteKind.Text.createNoteForState(reminderState)
         val meetingNote = NewNoteKind.Meeting.createNoteForState(folderState)
+        val studyNote = NewNoteKind.Study.createNoteForState(folderState)
         val lockedNote = NewNoteKind.Sticky.createNoteForState(lockedState)
         val unlockedNote = NewNoteKind.Text.createNoteForState(unlockedState)
         val archivedNote = NewNoteKind.Text.createNoteForState(archivedState)
@@ -313,6 +326,8 @@ class NoteModelTest {
         assertTrue(reminderNote.reminderAt != null)
         assertEquals("Work/Product", meetingNote.folder)
         assertTrue(meetingNote.blocks.any { it is NoteBlock.Checklist })
+        assertEquals("Work/Product", studyNote.folder)
+        assertTrue(studyNote.blocks.any { it is NoteBlock.PageBreak })
         assertTrue(lockedNote.locked)
         assertFalse(unlockedNote.locked)
         assertTrue(archivedNote.archived)
@@ -321,11 +336,11 @@ class NoteModelTest {
 
     @Test
     fun storedNoteDefaultsFallbackToSupportedValues() {
-        val restored = noteDefaultsFromStoredValues("Meeting", "Cornell", 0xFFFFF8D6)
+        val restored = noteDefaultsFromStoredValues("DailyJournal", "Cornell", 0xFFFFF8D6)
         val caseInsensitive = noteDefaultsFromStoredValues("Text", "planner", DEFAULT_PAPER_COLORS.first())
         val fallback = noteDefaultsFromStoredValues("LegacyKind", "LegacyTemplate", 0xFF123456)
 
-        assertEquals(NewNoteKind.Meeting, restored.newNoteKind)
+        assertEquals(NewNoteKind.DailyJournal, restored.newNoteKind)
         assertEquals(PageTemplate.Cornell, restored.pageTemplate)
         assertEquals(0xFFFFF8D6, restored.paperColor)
         assertEquals(PageTemplate.Planner, caseInsensitive.pageTemplate)
@@ -513,6 +528,18 @@ class NoteModelTest {
             sharedText = null,
             quickKindName = "Meeting"
         )
+        val quickJournal = noteLaunchRequestFrom(
+            action = ACTION_QUICK_NOTE,
+            mimeType = null,
+            sharedText = null,
+            quickKindName = "DailyJournal"
+        )
+        val quickStudy = noteLaunchRequestFrom(
+            action = ACTION_QUICK_NOTE,
+            mimeType = null,
+            sharedText = null,
+            quickKindName = "Study"
+        )
         val openNote = noteLaunchRequestFrom(
             action = null,
             mimeType = null,
@@ -531,6 +558,8 @@ class NoteModelTest {
         assertEquals(NewNoteKind.Drawing, quickDraw.quickNoteKind)
         assertEquals(NewNoteKind.Sticky, quickSticky.quickNoteKind)
         assertEquals(NewNoteKind.Meeting, quickMeeting.quickNoteKind)
+        assertEquals(NewNoteKind.DailyJournal, quickJournal.quickNoteKind)
+        assertEquals(NewNoteKind.Study, quickStudy.quickNoteKind)
         assertEquals("note-42", openNote.openNoteId)
         assertEquals(null, invalid.quickNoteKind)
     }

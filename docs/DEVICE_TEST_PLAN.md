@@ -6,7 +6,7 @@ This plan is the exact checklist for the next Android-device approval gate. Do n
 
 ## Preconditions
 
-- Full local verification has passed for version `0.5.25`.
+- Full local verification has passed for version `0.5.26`.
 - Debug APK exists at `app\build\outputs\apk\debug\app-debug.apk`.
 - Package name is `com.example.snotes`.
 - If the device already has app data that should be preserved, export a backup from the installed app before uninstalling, clearing data, or replacing it.
@@ -41,6 +41,8 @@ If install fails because of a signature mismatch, stop and ask before uninstalli
 - Create sticky note.
 - Create handwriting note.
 - Create meeting note.
+- Create daily journal note.
+- Create study note.
 - Confirm every quick-create path opens an editor and persists content after leaving and relaunching.
 
 ### Rich Text And Page Tools
@@ -140,4 +142,3 @@ If install fails because of a signature mismatch, stop and ask before uninstalli
 - Do not clear data or uninstall without user approval.
 - If a signature mismatch blocks install, stop before uninstalling.
 - If runtime behavior fails, preserve logs, screenshots, and the installed APK path before editing the code.
-

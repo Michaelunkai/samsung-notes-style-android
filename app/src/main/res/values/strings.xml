@@ -17,4 +17,8 @@
     <string name="shortcut_draw_long">Create or open a handwriting note</string>
     <string name="shortcut_meeting_short">Meeting</string>
     <string name="shortcut_meeting_long">Create or open a meeting note</string>
+    <string name="shortcut_journal_short">Journal</string>
+    <string name="shortcut_journal_long">Create or open a daily journal note</string>
+    <string name="shortcut_study_short">Study note</string>
+    <string name="shortcut_study_long">Create or open a study note</string>
 </resources>
