@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.5.17
+
+- Added a selected-note Backup JSON export option inside the multi-select Export menu.
+- Reused the locked-note privacy filter from share/TXT/HTML export, so locked notes still need to be unlocked before their content is exported.
+- Made selected-note exports more portable by allowing a subset of notes to be saved as a re-importable backup payload.
+
+Verification for this release is local Kotlin compile, JVM unit tests, Android lint, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
+
 ## 0.5.16
 
 - Expanded note-card reminder actions to support Tomorrow, Next week, and Next month directly from the list/grid overflow menu.

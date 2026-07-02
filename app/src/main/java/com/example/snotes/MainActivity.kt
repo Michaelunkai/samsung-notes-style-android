@@ -2778,6 +2778,7 @@ fun SelectionActionBar(
     var reminderMenuOpen by remember { mutableStateOf(false) }
     var pendingSelectedExportText by remember { mutableStateOf<String?>(null) }
     var pendingSelectedHtmlExportText by remember { mutableStateOf<String?>(null) }
+    var pendingSelectedBackupExportText by remember { mutableStateOf<String?>(null) }
     val shareableSelectedNotes = state.selectedExportableNotes
     val lockedSkippedCount = state.selectedLockedNotesNeedingUnlockCount
     val selectedExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
@@ -2809,6 +2810,21 @@ fun SelectionActionBar(
             viewModel.setStatus("Selected note HTML export failed")
         }
         pendingSelectedHtmlExportText = null
+    }
+    val selectedBackupExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        if (uri == null) {
+            pendingSelectedBackupExportText = null
+            return@rememberLauncherForActivityResult
+        }
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(pendingSelectedBackupExportText.orEmpty().toByteArray())
+            } ?: error("Unable to open selected-note backup destination")
+            viewModel.setStatus("Selected notes exported as backup")
+        }.onFailure {
+            viewModel.setStatus("Selected note backup export failed")
+        }
+        pendingSelectedBackupExportText = null
     }
     if (moveDialogOpen) {
         BatchTextActionDialog(
@@ -2898,6 +2914,20 @@ fun SelectionActionBar(
                             pendingSelectedHtmlExportText = shareableSelectedNotes.toHtmlDocumentBundle()
                             viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
                             selectedHtmlExportLauncher.launch("snotes-selected-${System.currentTimeMillis()}.html")
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Backup JSON") },
+                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                    onClick = {
+                        exportMenuOpen = false
+                        if (shareableSelectedNotes.isEmpty()) {
+                            viewModel.setStatus("Unlock notes before exporting")
+                        } else {
+                            pendingSelectedBackupExportText = notesToBackupJson(shareableSelectedNotes)
+                            viewModel.setStatus(selectedExportStatus("Exporting", shareableSelectedNotes.size, lockedSkippedCount))
+                            selectedBackupExportLauncher.launch("snotes-selected-backup-${System.currentTimeMillis()}.json")
                         }
                     }
                 )
