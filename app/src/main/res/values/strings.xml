@@ -5,6 +5,7 @@
     <string name="widget_quick_checklist">Checklist</string>
     <string name="widget_quick_sticky">Sticky</string>
     <string name="widget_quick_drawing">Draw</string>
+    <string name="widget_quick_meeting">Meet</string>
     <string name="shortcut_disabled">Shortcut disabled</string>
     <string name="shortcut_text_short">Text note</string>
     <string name="shortcut_text_long">Create or open a text note</string>
@@ -14,4 +15,6 @@
     <string name="shortcut_sticky_long">Create or open a sticky note</string>
     <string name="shortcut_draw_short">Handwriting</string>
     <string name="shortcut_draw_long">Create or open a handwriting note</string>
+    <string name="shortcut_meeting_short">Meeting</string>
+    <string name="shortcut_meeting_long">Create or open a meeting note</string>
 </resources>

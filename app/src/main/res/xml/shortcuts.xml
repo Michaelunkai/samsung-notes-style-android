@@ -64,4 +64,20 @@
                 android:value="Sticky" />
         </intent>
     </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutDisabledMessage="@string/shortcut_disabled"
+        android:shortcutId="quick_meeting_note"
+        android:shortcutLongLabel="@string/shortcut_meeting_long"
+        android:shortcutShortLabel="@string/shortcut_meeting_short">
+        <intent
+            android:action="com.example.snotes.action.QUICK_NOTE"
+            android:targetClass="com.example.snotes.MainActivity"
+            android:targetPackage="com.example.snotes">
+            <extra
+                android:name="com.example.snotes.extra.QUICK_NOTE_KIND"
+                android:value="Meeting" />
+        </intent>
+    </shortcut>
 </shortcuts>

@@ -404,6 +404,12 @@ class NoteModelTest {
             sharedText = null,
             quickKindName = "Sticky"
         )
+        val quickMeeting = noteLaunchRequestFrom(
+            action = ACTION_QUICK_NOTE,
+            mimeType = null,
+            sharedText = null,
+            quickKindName = "Meeting"
+        )
         val openNote = noteLaunchRequestFrom(
             action = null,
             mimeType = null,
@@ -421,6 +427,7 @@ class NoteModelTest {
         assertEquals("Shared meeting note", shared.sharedText)
         assertEquals(NewNoteKind.Drawing, quickDraw.quickNoteKind)
         assertEquals(NewNoteKind.Sticky, quickSticky.quickNoteKind)
+        assertEquals(NewNoteKind.Meeting, quickMeeting.quickNoteKind)
         assertEquals("note-42", openNote.openNoteId)
         assertEquals(null, invalid.quickNoteKind)
     }
@@ -882,7 +889,13 @@ class NoteModelTest {
     @Test
     fun widgetQuickActionsExposePrimaryNoteKinds() {
         assertEquals(
-            listOf(NewNoteKind.Text, NewNoteKind.Checklist, NewNoteKind.Sticky, NewNoteKind.Drawing),
+            listOf(
+                NewNoteKind.Text,
+                NewNoteKind.Checklist,
+                NewNoteKind.Sticky,
+                NewNoteKind.Drawing,
+                NewNoteKind.Meeting
+            ),
             widgetQuickNoteKinds()
         )
     }
