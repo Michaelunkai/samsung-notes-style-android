@@ -174,6 +174,9 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
+import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -193,6 +196,8 @@ const val ACTION_QUICK_NOTE = "com.example.snotes.action.QUICK_NOTE"
 const val EXTRA_QUICK_NOTE_KIND = "com.example.snotes.extra.QUICK_NOTE_KIND"
 const val EXTRA_OPEN_NOTE_ID = "com.example.snotes.extra.OPEN_NOTE_ID"
 const val PINNED_NOTE_SHORTCUT_PREFIX = "pinned_note_"
+const val FILE_PROVIDER_CAPTURED_IMAGES = "captured_images"
+const val FILE_PROVIDER_IMPORTED_ATTACHMENTS = "imported_attachments"
 const val SETTINGS_STORE = "notes_settings"
 const val SETTING_DARK_MODE = "dark_mode"
 const val SETTING_DEFAULT_NOTE_KIND = "default_note_kind"
@@ -1172,6 +1177,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
                 selectedNoteId = state.selectedNoteId.takeUnless { it == note.id }
             )
         }
+        cleanupUnreferencedLocalFiles(note.blocks)
         persist()
     }
 
@@ -1292,6 +1298,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun batchDeleteSelectedPermanently() {
         val deletedIds = _state.value.selectedNoteIds
+        val deletedBlocks = _state.value.notes.filter { it.id in deletedIds }.flatMap { it.blocks }
         deletedIds.forEach { cancelNoteReminder(getApplication(), it) }
         _state.update { state ->
             state.copy(
@@ -1301,6 +1308,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
                 statusMessage = "Deleted selected notes"
             )
         }
+        cleanupUnreferencedLocalFiles(deletedBlocks)
         persist()
     }
 
@@ -1316,7 +1324,8 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun emptyTrash() {
-        val deletedIds = _state.value.notes.filter { it.deleted }.map { it.id }
+        val deletedNotes = _state.value.notes.filter { it.deleted }
+        val deletedIds = deletedNotes.map { it.id }
         deletedIds.forEach { cancelNoteReminder(getApplication(), it) }
         _state.update { state ->
             state.copy(
@@ -1328,6 +1337,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
                 statusMessage = "Trash emptied"
             )
         }
+        cleanupUnreferencedLocalFiles(deletedNotes.flatMap { it.blocks })
         persist()
     }
 
@@ -1378,6 +1388,7 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeBlock(note: SNote, block: NoteBlock) {
         updateNote(note.copy(blocks = note.blocks.filterNot { it.id == block.id }))
+        cleanupUnreferencedLocalFiles(listOf(block))
     }
 
     fun duplicateBlock(note: SNote, block: NoteBlock) {
@@ -1402,6 +1413,22 @@ class NotesViewModel(application: Application) : AndroidViewModel(application) {
             repository.saveNote(note)
             scheduleNoteReminder(getApplication(), note)
             refreshNotesWidgets(getApplication())
+        }
+    }
+
+    private fun cleanupUnreferencedLocalFiles(removedBlocks: List<NoteBlock>) {
+        val app = getApplication<Application>()
+        val removedRefs = removedBlocks
+            .mapNotNull { it.localFileReference(app.packageName) }
+            .distinct()
+        if (removedRefs.isEmpty()) return
+        val remainingRefs = _state.value.notes
+            .flatMap { note -> note.blocks.mapNotNull { it.localFileReference(app.packageName) } }
+            .toSet()
+        val deletable = removedRefs.filterNot { it in remainingRefs }
+        if (deletable.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            deletable.forEach { it.toFile(app).delete() }
         }
     }
 
@@ -4260,6 +4287,10 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
 
 data class AttachmentMetadata(val name: String, val mimeHint: String, val sizeBytes: Long)
 
+data class LocalFileReference(val directory: String, val fileName: String) {
+    fun toFile(context: Context): File = File(File(context.filesDir, directory), fileName)
+}
+
 data class CameraCaptureTarget(val uri: Uri, val file: File) {
     fun toAttachmentBlock(): NoteBlock.Attachment =
         NoteBlock.Attachment(
@@ -4300,6 +4331,32 @@ fun String.safeLocalFileName(): String =
         .trim()
         .ifBlank { "attachment" }
         .take(96)
+
+fun NoteBlock.localFileReference(packageName: String): LocalFileReference? = when (this) {
+    is NoteBlock.Attachment -> uri.localFileReference(packageName)
+    is NoteBlock.Audio -> path.localFileReference(packageName)
+    else -> null
+}
+
+fun String.localFileReference(packageName: String): LocalFileReference? = runCatching {
+    val parsed = URI(this)
+    if (parsed.scheme != "content" || parsed.authority != "$packageName.fileprovider") return@runCatching null
+    val segments = parsed.rawPath
+        ?.trimStart('/')
+        ?.split('/')
+        ?.filter { it.isNotBlank() }
+        ?: return@runCatching null
+    if (segments.size < 2) return@runCatching null
+    val directory = when (decodeUriSegment(segments.first())) {
+        FILE_PROVIDER_CAPTURED_IMAGES -> "captures"
+        FILE_PROVIDER_IMPORTED_ATTACHMENTS -> "imports"
+        else -> return@runCatching null
+    }
+    LocalFileReference(directory = directory, fileName = decodeUriSegment(segments.last()))
+}.getOrNull()
+
+fun decodeUriSegment(segment: String): String =
+    URLDecoder.decode(segment, StandardCharsets.UTF_8.name())
 
 fun createCameraCaptureTarget(context: Context): CameraCaptureTarget {
     val captureDir = File(context.filesDir, "captures").apply { mkdirs() }

@@ -1320,6 +1320,26 @@ class NoteModelTest {
     }
 
     @Test
+    fun localFileReferencesOnlyMatchAppFileProviderRoots() {
+        val imported = "content://com.example.snotes.fileprovider/imported_attachments/brief.pdf".localFileReference("com.example.snotes")
+        val captured = NoteBlock.Attachment(
+            uri = "content://com.example.snotes.fileprovider/captured_images/capture.jpg",
+            name = "capture.jpg"
+        ).localFileReference("com.example.snotes")
+        val audio = NoteBlock.Audio(
+            path = "content://com.example.snotes.fileprovider/imported_attachments/clip.m4a",
+            name = "clip.m4a"
+        ).localFileReference("com.example.snotes")
+
+        assertEquals(LocalFileReference("imports", "brief.pdf"), imported)
+        assertEquals(LocalFileReference("captures", "capture.jpg"), captured)
+        assertEquals(LocalFileReference("imports", "clip.m4a"), audio)
+        assertNull("content://other.app/fileprovider/imported_attachments/brief.pdf".localFileReference("com.example.snotes"))
+        assertNull("content://com.example.snotes.fileprovider/other/brief.pdf".localFileReference("com.example.snotes"))
+        assertNull("file:///tmp/brief.pdf".localFileReference("com.example.snotes"))
+    }
+
+    @Test
     fun audioDurationFormattingUsesMinuteSecondLabels() {
         assertEquals("", formatDuration(0))
         assertEquals("0:01", formatDuration(1_500))
