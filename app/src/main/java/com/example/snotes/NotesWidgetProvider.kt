@@ -20,20 +20,41 @@ fun widgetQuickNoteKinds(): List<NewNoteKind> =
         NewNoteKind.Meeting
     )
 
-fun notesWidgetSummary(notes: List<SNote>): NotesWidgetSummary {
+fun notesWidgetSummary(notes: List<SNote>, now: Long = System.currentTimeMillis()): NotesWidgetSummary {
     val visible = notes.filterNot { it.deleted }.sortedWith(NoteSortMode.ModifiedNewest.comparator)
     val latest = visible.firstOrNull()
+    val status = notesWidgetStatus(visible, now)
     return NotesWidgetSummary(
         title = latest?.title ?: "S Notes Style",
         subtitle = when {
             latest == null -> "No notes yet"
-            latest.locked -> "Locked note • ${visible.size} note${if (visible.size == 1) "" else "s"}"
-            latest.reminderAt != null -> "${latest.reminderLabel()} • ${visible.size} note${if (visible.size == 1) "" else "s"}"
-            latest.preview.isNotBlank() -> "${latest.preview} • ${visible.size} note${if (visible.size == 1) "" else "s"}"
-            else -> "${latest.folder} • ${visible.size} note${if (visible.size == 1) "" else "s"}"
+            latest.locked -> "Locked note • $status"
+            latest.reminderAt != null -> "${latest.reminderLabel(now)} • $status"
+            latest.preview.isNotBlank() -> "${latest.preview} • $status"
+            else -> "${latest.folder} • $status"
         },
         noteId = latest?.id
     )
+}
+
+fun notesWidgetStatus(notes: List<SNote>, now: Long = System.currentTimeMillis()): String {
+    val noteCount = "${notes.size} note${if (notes.size == 1) "" else "s"}"
+    val overdue = notes.count { (it.reminderAt ?: Long.MAX_VALUE) < now }
+    val upcomingReminders = notes.count { (it.reminderAt ?: 0L) >= now }
+    val checklistItems = notes.flatMap { it.blocks }.filterIsInstance<NoteBlock.Checklist>().sumOf { it.items.size }
+    val completedChecklistItems = notes.flatMap { it.blocks }
+        .filterIsInstance<NoteBlock.Checklist>()
+        .sumOf { checklist -> checklist.items.count { it.checked } }
+    val mediaBlocks = notes.sumOf { it.mediaBlockCount() }
+    return buildList {
+        add(noteCount)
+        when {
+            overdue > 0 -> add("$overdue overdue")
+            upcomingReminders > 0 -> add("$upcomingReminders reminder${if (upcomingReminders == 1) "" else "s"}")
+        }
+        if (checklistItems > 0) add("$completedChecklistItems/$checklistItems tasks")
+        if (mediaBlocks > 0) add("$mediaBlocks media")
+    }.joinToString(" • ")
 }
 
 fun refreshNotesWidgets(context: Context) {

@@ -18,6 +18,7 @@
 - Improved large-library persistence by deleting permanently removed notes with targeted Room row deletes instead of replacing the whole note table.
 - Added meeting-note launcher shortcuts and widget quick actions.
 - Added per-note pinned Home screen shortcut requests from note cards and the editor overflow menu.
+- Enhanced the home-screen widget summary with reminder, checklist-progress, and media-count status while keeping locked-note body text private.
 
 Verification for this release is local build, unit-test, manifest/resource, and debug APK assembly only. Android-device testing is intentionally deferred until the explicit approval gate.
 

@@ -967,6 +967,44 @@ class NoteModelTest {
     }
 
     @Test
+    fun widgetSummaryIncludesReminderChecklistAndMediaStatus() {
+        val now = 10_000L
+        val summary = notesWidgetSummary(
+            listOf(
+                SNote(
+                    id = "latest",
+                    title = "Today",
+                    updatedAt = 30,
+                    reminderAt = now - 1_000,
+                    blocks = listOf(
+                        NoteBlock.Checklist(
+                            items = listOf(
+                                CheckItem(text = "Done", checked = true),
+                                CheckItem(text = "Open", checked = false)
+                            )
+                        ),
+                        NoteBlock.Attachment(uri = "content://example/pdf", name = "brief.pdf")
+                    )
+                ),
+                SNote(
+                    title = "Soon",
+                    updatedAt = 20,
+                    reminderAt = now + 60_000,
+                    blocks = listOf(NoteBlock.Audio(path = "/audio/clip.m4a", name = "clip.m4a"))
+                )
+            ),
+            now = now
+        )
+
+        assertEquals("Today", summary.title)
+        assertTrue(summary.subtitle.contains("Overdue"))
+        assertTrue(summary.subtitle.contains("2 notes"))
+        assertTrue(summary.subtitle.contains("1 overdue"))
+        assertTrue(summary.subtitle.contains("1/2 tasks"))
+        assertTrue(summary.subtitle.contains("2 media"))
+    }
+
+    @Test
     fun widgetQuickActionsExposePrimaryNoteKinds() {
         assertEquals(
             listOf(
