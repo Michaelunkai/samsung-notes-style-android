@@ -11,6 +11,7 @@ import android.content.pm.ShortcutManager
 import android.graphics.BitmapFactory
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
+import android.graphics.pdf.PdfRenderer
 import android.graphics.drawable.Icon as AndroidIcon
 import android.media.MediaPlayer
 import android.media.MediaRecorder
@@ -331,7 +332,8 @@ sealed class NoteBlock(open val id: String, open val label: String) {
         val uri: String,
         val name: String,
         val mimeHint: String = "file",
-        val sizeBytes: Long = 0L
+        val sizeBytes: Long = 0L,
+        val pageCount: Int = 0
     ) : NoteBlock(id, "Attachment")
 
     data class Audio(
@@ -1738,7 +1740,7 @@ fun NoteBlock.toPlainText(): String = when (this) {
         "${if (item.checked) "- [x]" else "- [ ]"} ${item.text.ifBlank { "Checklist item" }}"
     }
     is NoteBlock.Drawing -> "[Handwriting: ${strokes.size} stroke${if (strokes.size == 1) "" else "s"}]"
-    is NoteBlock.Attachment -> "[Attachment: $name${sizeLabel.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
+    is NoteBlock.Attachment -> "[Attachment: $name${exportDetailLabel.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]"
     is NoteBlock.Audio -> buildString {
         append("[Audio: $name${formatDuration(durationHintMs).takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty()}]")
         markers.forEach { marker ->
@@ -1771,7 +1773,7 @@ fun NoteBlock.toHtml(): String = when (this) {
     }
     is NoteBlock.Sticky -> """<section class="block sticky" style="background: ${cssColor(color)}">${text.ifBlank { "Empty sticky note" }.escapeHtml()}</section>"""
     is NoteBlock.Drawing -> """<section class="block media">Handwriting: ${strokes.size} stroke${if (strokes.size == 1) "" else "s"}</section>"""
-    is NoteBlock.Attachment -> """<section class="block media">Attachment: ${name.escapeHtml()}${sizeLabel.takeIf { it.isNotBlank() }?.let { " (${it.escapeHtml()})" }.orEmpty()}</section>"""
+    is NoteBlock.Attachment -> """<section class="block media">Attachment: ${name.escapeHtml()}${exportDetailLabel.takeIf { it.isNotBlank() }?.let { " (${it.escapeHtml()})" }.orEmpty()}</section>"""
     is NoteBlock.Audio -> {
         val markersHtml = markers.takeIf { it.isNotEmpty() }?.joinToString("\n", prefix = """<ul class="markers">""", postfix = "</ul>") { marker ->
             """<li>${formatDuration(marker.timestampMs).escapeHtml()} ${marker.label.escapeHtml()}</li>"""
@@ -4254,7 +4256,7 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
                 Column(Modifier.weight(1f)) {
                     Text(block.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        listOf(block.mimeHint, block.sizeLabel).filter { it.isNotBlank() }.joinToString(" • "),
+                        block.metadataLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -4285,7 +4287,7 @@ fun AttachmentBlock(note: SNote, block: NoteBlock.Attachment, viewModel: NotesVi
     }
 }
 
-data class AttachmentMetadata(val name: String, val mimeHint: String, val sizeBytes: Long)
+data class AttachmentMetadata(val name: String, val mimeHint: String, val sizeBytes: Long, val pageCount: Int = 0)
 
 data class LocalFileReference(val directory: String, val fileName: String) {
     fun toFile(context: Context): File = File(File(context.filesDir, directory), fileName)
@@ -4309,13 +4311,16 @@ fun AttachmentMetadata.toNoteBlock(uri: String): NoteBlock =
             uri = uri,
             name = name,
             mimeHint = mimeHint,
-            sizeBytes = sizeBytes
+            sizeBytes = sizeBytes,
+            pageCount = pageCount
         )
     }
 
 fun importAttachmentToLocalBlock(context: Context, uri: Uri, mimeHint: String? = null): NoteBlock {
     val metadata = queryAttachmentMetadata(context, uri).let { queried ->
         if (mimeHint.isNullOrBlank()) queried else queried.copy(mimeHint = mimeHint)
+    }.let { effective ->
+        if (effective.pageCount > 0 || !effective.isPdf) effective else effective.copy(pageCount = queryPdfPageCount(context, uri, effective.mimeHint))
     }
     val importDir = File(context.filesDir, "imports").apply { mkdirs() }
     val file = File(importDir, "${System.currentTimeMillis()}-${metadata.name.safeLocalFileName()}")
@@ -4376,15 +4381,21 @@ fun queryAttachmentMetadata(context: Context, uri: Uri): AttachmentMetadata {
             if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex)
         }
     }
+    val mimeHint = context.contentResolver.getType(uri)
+        ?: if (name.endsWith(".pdf", ignoreCase = true)) "application/pdf" else "file"
     return AttachmentMetadata(
         name = name,
-        mimeHint = context.contentResolver.getType(uri) ?: "file",
-        sizeBytes = size
+        mimeHint = mimeHint,
+        sizeBytes = size,
+        pageCount = queryPdfPageCount(context, uri, mimeHint)
     )
 }
 
 val NoteBlock.Attachment.isImageAttachment: Boolean
     get() = mimeHint.startsWith("image/")
+
+val NoteBlock.Attachment.isPdfAttachment: Boolean
+    get() = mimeHint.equals("application/pdf", ignoreCase = true) || name.endsWith(".pdf", ignoreCase = true)
 
 val NoteBlock.Attachment.viewMimeType: String
     get() = mimeHint.ifBlank { "*/*" }
@@ -4396,6 +4407,33 @@ fun NoteBlock.Attachment.toViewIntent(): Intent =
 
 val NoteBlock.Attachment.sizeLabel: String
     get() = formatBytes(sizeBytes)
+
+val NoteBlock.Attachment.pageCountLabel: String
+    get() = formatPageCount(pageCount)
+
+val NoteBlock.Attachment.metadataLabel: String
+    get() = listOf(mimeHint, pageCountLabel, sizeLabel).filter { it.isNotBlank() }.joinToString(" • ")
+
+val NoteBlock.Attachment.exportDetailLabel: String
+    get() = listOf(pageCountLabel, sizeLabel).filter { it.isNotBlank() }.joinToString(", ")
+
+val AttachmentMetadata.isPdf: Boolean
+    get() = mimeHint.equals("application/pdf", ignoreCase = true) || name.endsWith(".pdf", ignoreCase = true)
+
+fun queryPdfPageCount(context: Context, uri: Uri, mimeHint: String): Int {
+    if (!mimeHint.equals("application/pdf", ignoreCase = true) && !uri.toString().endsWith(".pdf", ignoreCase = true)) return 0
+    return runCatching {
+        context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
+            PdfRenderer(descriptor).use { renderer -> renderer.pageCount }
+        } ?: 0
+    }.getOrDefault(0)
+}
+
+fun formatPageCount(pageCount: Int): String = when {
+    pageCount <= 0 -> ""
+    pageCount == 1 -> "1 page"
+    else -> "$pageCount pages"
+}
 
 fun formatBytes(sizeBytes: Long): String = when {
     sizeBytes <= 0L -> ""
@@ -4570,11 +4608,12 @@ fun SNote.editorSearchMatches(query: String): List<EditorSearchMatch> {
                 is NoteBlock.Sticky -> if (block.text.contains(normalized, ignoreCase = true)) {
                     add(EditorSearchMatch(block.id, "Sticky note", block.text.searchSnippet(normalized)))
                 }
-                is NoteBlock.Attachment -> if (
-                    block.name.contains(normalized, ignoreCase = true) ||
-                    block.mimeHint.contains(normalized, ignoreCase = true)
+        is NoteBlock.Attachment -> if (
+            block.name.contains(normalized, ignoreCase = true) ||
+                    block.mimeHint.contains(normalized, ignoreCase = true) ||
+                    block.pageCountLabel.contains(normalized, ignoreCase = true)
                 ) {
-                    add(EditorSearchMatch(block.id, "Attachment", block.name.searchSnippet(normalized)))
+                    add(EditorSearchMatch(block.id, if (block.isPdfAttachment) "PDF attachment" else "Attachment", block.name.searchSnippet(normalized)))
                 }
                 is NoteBlock.Audio -> {
                     if (
@@ -4623,9 +4662,10 @@ fun NoteBlock.contentSearchLabels(query: String): List<String> = when (this) {
 fun NoteBlock.attachmentSearchLabels(query: String): List<String> = when (this) {
     is NoteBlock.Attachment -> if (
         name.contains(query, ignoreCase = true) ||
-        mimeHint.contains(query, ignoreCase = true)
+        mimeHint.contains(query, ignoreCase = true) ||
+        pageCountLabel.contains(query, ignoreCase = true)
     ) {
-        listOf("File: $name")
+        listOf("${if (isPdfAttachment) "PDF" else "File"}: $name")
     } else {
         emptyList()
     }
@@ -4864,6 +4904,7 @@ fun NoteBlock.toJson(): JSONObject {
             .put("name", name)
             .put("mimeHint", mimeHint)
             .put("sizeBytes", sizeBytes)
+            .put("pageCount", pageCount)
 
         is NoteBlock.Audio -> json
             .put("type", "audio")
@@ -4946,7 +4987,8 @@ fun JSONObject.toBlock(): NoteBlock = when (optString("type")) {
         uri = optString("uri"),
         name = optString("name", "Attachment"),
         mimeHint = optString("mimeHint", "file"),
-        sizeBytes = optLong("sizeBytes", 0L)
+        sizeBytes = optLong("sizeBytes", 0L),
+        pageCount = optInt("pageCount", 0)
     )
 
     "audio" -> NoteBlock.Audio(

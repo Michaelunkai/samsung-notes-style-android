@@ -46,7 +46,7 @@ class NoteModelTest {
                         )
                     )
                 ),
-                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", mimeHint = "application/pdf", sizeBytes = 2048),
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", mimeHint = "application/pdf", sizeBytes = 2048, pageCount = 4),
                 NoteBlock.Audio(
                     path = "/recordings/one.m4a",
                     name = "one.m4a",
@@ -80,6 +80,7 @@ class NoteModelTest {
         assertEquals(DrawTool.Fountain, (restored.blocks[3] as NoteBlock.Drawing).strokes.first().tool)
         assertEquals("brief.pdf", (restored.blocks[4] as NoteBlock.Attachment).name)
         assertEquals("2 KB", (restored.blocks[4] as NoteBlock.Attachment).sizeLabel)
+        assertEquals("4 pages", (restored.blocks[4] as NoteBlock.Attachment).pageCountLabel)
         assertEquals("one.m4a", (restored.blocks[5] as NoteBlock.Audio).name)
         assertEquals("Decision point", (restored.blocks[5] as NoteBlock.Audio).markers.single().label)
         assertEquals(12_000, (restored.blocks[5] as NoteBlock.Audio).markers.single().timestampMs)
@@ -163,7 +164,7 @@ class NoteModelTest {
         assertTrue(note.searchMatches("sticky", SearchScope.Content).single().label.startsWith("Sticky:"))
         assertTrue(note.searchMatches("decision", SearchScope.Content).single().label.startsWith("Audio marker:"))
         assertEquals(
-            listOf("File: launch-deck.pdf", "Audio: launch-briefing.m4a"),
+            listOf("PDF: launch-deck.pdf", "Audio: launch-briefing.m4a"),
             note.searchMatches("launch", SearchScope.Attachments).map { it.label }
         )
 
@@ -638,7 +639,7 @@ class NoteModelTest {
                 ),
                 NoteBlock.Sticky(text = "Remember stakeholder questions"),
                 NoteBlock.Drawing(strokes = listOf(DrawStroke(color = 0xFF111111, width = 4f, points = listOf(DrawPoint(1f, 1f))))),
-                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", mimeHint = "application/pdf", sizeBytes = 2048, pageCount = 3),
                 NoteBlock.Audio(
                     path = "/audio/review.m4a",
                     name = "review.m4a",
@@ -658,7 +659,7 @@ class NoteModelTest {
         assertTrue(text.contains("- [ ] Follow up"))
         assertTrue(text.contains("[Sticky note] Remember stakeholder questions"))
         assertTrue(text.contains("[Handwriting: 1 stroke]"))
-        assertTrue(text.contains("[Attachment: brief.pdf, 2 KB]"))
+        assertTrue(text.contains("[Attachment: brief.pdf, 3 pages, 2 KB]"))
         assertTrue(text.contains("[Audio: review.m4a, 1:05]"))
         assertTrue(text.contains("- 0:12 Stakeholder question"))
     }
@@ -690,7 +691,7 @@ class NoteModelTest {
                     )
                 ),
                 NoteBlock.Sticky(text = "Remember stakeholders", color = 0xFFFFF59D),
-                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", sizeBytes = 2048),
+                NoteBlock.Attachment(uri = "content://example/file", name = "brief.pdf", mimeHint = "application/pdf", sizeBytes = 2048, pageCount = 3),
                 NoteBlock.Audio(
                     path = "/audio/review.m4a",
                     name = "review.m4a",
@@ -718,7 +719,7 @@ class NoteModelTest {
         assertTrue(html.contains("☑ Demo &amp; ship"))
         assertTrue(html.contains("☐ Follow up"))
         assertTrue(html.contains("Remember stakeholders"))
-        assertTrue(html.contains("Attachment: brief.pdf (2 KB)"))
+        assertTrue(html.contains("Attachment: brief.pdf (3 pages, 2 KB)"))
         assertTrue(html.contains("Audio: review.m4a (1:05)"))
         assertTrue(html.contains("0:12 Question &lt;risk&gt;"))
     }
@@ -1286,22 +1287,29 @@ class NoteModelTest {
             uri = "content://example/document",
             name = "document.pdf",
             mimeHint = "application/pdf",
-            sizeBytes = 900
+            sizeBytes = 900,
+            pageCount = 12
         )
 
         assertTrue(image.isImageAttachment)
         assertFalse(file.isImageAttachment)
+        assertTrue(file.isPdfAttachment)
         assertEquals("image/jpeg", image.viewMimeType)
         assertEquals("*/*", file.copy(mimeHint = "").viewMimeType)
         assertEquals("2 MB", image.sizeLabel)
         assertEquals("900 B", file.sizeLabel)
+        assertEquals("12 pages", file.pageCountLabel)
+        assertEquals("application/pdf • 12 pages • 900 B", file.metadataLabel)
+        assertEquals("12 pages, 900 B", file.exportDetailLabel)
         assertEquals("", formatBytes(0))
+        assertEquals("", formatPageCount(0))
+        assertEquals("1 page", formatPageCount(1))
     }
 
     @Test
     fun importedAudioMetadataCreatesPlayableAudioBlock() {
         val audio = AttachmentMetadata("clip.m4a", "audio/mp4", 4096).toNoteBlock("content://example/audio")
-        val pdf = AttachmentMetadata("brief.pdf", "application/pdf", 4096).toNoteBlock("content://example/pdf")
+        val pdf = AttachmentMetadata("brief.pdf", "application/pdf", 4096, pageCount = 7).toNoteBlock("content://example/pdf")
 
         assertTrue(audio is NoteBlock.Audio)
         assertEquals("content://example/audio", (audio as NoteBlock.Audio).path)
@@ -1309,6 +1317,7 @@ class NoteModelTest {
         assertTrue(audio.markers.isEmpty())
         assertTrue(pdf is NoteBlock.Attachment)
         assertEquals("brief.pdf", (pdf as NoteBlock.Attachment).name)
+        assertEquals(7, pdf.pageCount)
     }
 
     @Test
